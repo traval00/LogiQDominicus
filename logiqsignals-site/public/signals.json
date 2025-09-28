@@ -1,0 +1,54 @@
+[
+  {
+    "ticker":"TSLA",
+    "timeframe":"15m-intraday",
+    "strategy":"ORB+EMA break&retest",
+    "prob":0.867,
+    "news_sent":0.0,
+    "entry":434.0,
+    "stop":433.22,
+    "targets":[
+      434.78,
+      435.56
+    ],
+    "trail":{
+      "method":"ema20_atr",
+      "atr_mult":1.0
+    },
+    "options_suggestion":{
+      "expiration":"2025-10-03",
+      "strike":455.0,
+      "symbol":"TSLA251003C00455000",
+      "last":10.3,
+      "bid":10.15,
+      "ask":10.3
+    },
+    "asof":"2025-09-22 19:45"
+  },
+  {
+    "ticker":"GME",
+    "timeframe":"15m-intraday",
+    "strategy":"ORB+EMA break&retest",
+    "prob":0.671,
+    "news_sent":0.0,
+    "entry":26.79,
+    "stop":26.7,
+    "targets":[
+      26.88,
+      26.97
+    ],
+    "trail":{
+      "method":"ema20_atr",
+      "atr_mult":1.0
+    },
+    "options_suggestion":{
+      "expiration":"2025-10-03",
+      "strike":28.0,
+      "symbol":"GME251003C00028000",
+      "last":0.68,
+      "bid":0.65,
+      "ask":0.67
+    },
+    "asof":"2025-09-22 19:45"
+  }
+]

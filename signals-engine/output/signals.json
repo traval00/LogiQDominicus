@@ -1,0 +1,54 @@
+[
+  {
+    "ticker":"TSLA",
+    "timeframe":"15m-intraday",
+    "strategy":"ORB+EMA break&retest",
+    "prob":0.59,
+    "news_sent":0.0,
+    "entry":440.4199,
+    "stop":434.9672,
+    "targets":[
+      445.8726,
+      451.3253
+    ],
+    "trail":{
+      "method":"ema20_atr",
+      "atr_mult":1.0
+    },
+    "options_suggestion":{
+      "expiration":"2025-10-10",
+      "strike":460.0,
+      "symbol":"TSLA251010C00460000",
+      "last":11.19,
+      "bid":11.2,
+      "ask":11.35
+    },
+    "asof":"2025-09-26 19:45"
+  },
+  {
+    "ticker":"AAPL",
+    "timeframe":"15m-intraday",
+    "strategy":"ORB+EMA break&retest",
+    "prob":0.948,
+    "news_sent":0.0,
+    "entry":255.46,
+    "stop":254.9,
+    "targets":[
+      256.02,
+      256.58
+    ],
+    "trail":{
+      "method":"ema20_atr",
+      "atr_mult":1.0
+    },
+    "options_suggestion":{
+      "expiration":"2025-10-10",
+      "strike":270.0,
+      "symbol":"AAPL251010C00270000",
+      "last":0.5,
+      "bid":0.48,
+      "ask":0.51
+    },
+    "asof":"2025-09-26 19:45"
+  }
+]
