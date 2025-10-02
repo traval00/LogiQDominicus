@@ -1,106 +1,98 @@
 [
   {
+    "ticker":"BTC-USD",
+    "weekly_change":0.016221667
+  },
+  {
+    "ticker":"XRP-USD",
+    "weekly_change":0.0102312385
+  },
+  {
+    "ticker":"ETH-USD",
+    "weekly_change":0.0012105732
+  },
+  {
     "ticker":"ARB-USD",
     "weekly_change":-0.0002761272
   },
   {
-    "ticker":"BTC-USD",
-    "weekly_change":-0.0543340986
-  },
-  {
-    "ticker":"XRP-USD",
-    "weekly_change":-0.0626759375
-  },
-  {
-    "ticker":"ATOM-USD",
-    "weekly_change":-0.0825812317
-  },
-  {
-    "ticker":"SHIB-USD",
-    "weekly_change":-0.094495801
+    "ticker":"LINK-USD",
+    "weekly_change":-0.0024317115
   },
   {
     "ticker":"ETC-USD",
-    "weekly_change":-0.0977122922
+    "weekly_change":-0.0110481414
   },
   {
-    "ticker":"LINK-USD",
-    "weekly_change":-0.1061451021
+    "ticker":"SHIB-USD",
+    "weekly_change":-0.0120856683
   },
   {
-    "ticker":"ETH-USD",
-    "weekly_change":-0.1066149365
-  },
-  {
-    "ticker":"RUNE-USD",
-    "weekly_change":-0.1117764419
-  },
-  {
-    "ticker":"HBAR-USD",
-    "weekly_change":-0.1211322281
-  },
-  {
-    "ticker":"ADA-USD",
-    "weekly_change":-0.125466713
+    "ticker":"ATOM-USD",
+    "weekly_change":-0.0232281099
   },
   {
     "ticker":"PYTH-USD",
-    "weekly_change":-0.1282400337
+    "weekly_change":-0.0253511557
   },
   {
-    "ticker":"SEI-USD",
-    "weekly_change":-0.129460315
+    "ticker":"RUNE-USD",
+    "weekly_change":-0.0290909007
   },
   {
-    "ticker":"AVAX-USD",
-    "weekly_change":-0.1330357027
+    "ticker":"HBAR-USD",
+    "weekly_change":-0.0292105717
   },
   {
-    "ticker":"NEAR-USD",
-    "weekly_change":-0.1386004984
+    "ticker":"ADA-USD",
+    "weekly_change":-0.0298514778
   },
   {
     "ticker":"DOGE-USD",
-    "weekly_change":-0.1416101394
+    "weekly_change":-0.0324376701
   },
   {
     "ticker":"INJ-USD",
-    "weekly_change":-0.1456537532
-  },
-  {
-    "ticker":"SOL-USD",
-    "weekly_change":-0.1556527467
-  },
-  {
-    "ticker":"AR-USD",
-    "weekly_change":-0.1559377551
+    "weekly_change":-0.0363381042
   },
   {
     "ticker":"FLOKI-USD",
-    "weekly_change":-0.1579617207
+    "weekly_change":-0.0380371658
   },
   {
-    "ticker":"BONK-USD",
-    "weekly_change":-0.1655136383
+    "ticker":"SOL-USD",
+    "weekly_change":-0.0450079254
   },
   {
-    "ticker":"OP-USD",
-    "weekly_change":-0.1708930463
+    "ticker":"SEI-USD",
+    "weekly_change":-0.0453812304
   },
   {
     "ticker":"JUP-USD",
-    "weekly_change":-0.1763166214
-  },
-  {
-    "ticker":"WIF-USD",
-    "weekly_change":-0.1800760476
+    "weekly_change":-0.0479315995
   },
   {
     "ticker":"TIA-USD",
-    "weekly_change":-0.18233581
+    "weekly_change":-0.0710993173
+  },
+  {
+    "ticker":"NEAR-USD",
+    "weekly_change":-0.0809337143
+  },
+  {
+    "ticker":"AR-USD",
+    "weekly_change":-0.0864206539
+  },
+  {
+    "ticker":"WIF-USD",
+    "weekly_change":-0.0943976423
+  },
+  {
+    "ticker":"AVAX-USD",
+    "weekly_change":-0.1101733004
   },
   {
     "ticker":"STRK-USD",
-    "weekly_change":-0.4181079649
+    "weekly_change":-0.4740417624
   }
 ]

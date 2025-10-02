@@ -1,3 +1,38 @@
 [
-
+  {
+    "ticker": "AAPL",
+    "timeframe": "1d-swing",
+    "strategy": "EMA20 retest + trend",
+    "prob": 0.63,
+    "entry": 224.1,
+    "stop": 218.7,
+    "targets": [
+      229.5,
+      232.9,
+      236.3
+    ],
+    "trail": {
+      "method": "ema20_atr",
+      "atr_mult": 1.5
+    },
+    "asof": "2025-10-02 09:00:47"
+  },
+  {
+    "ticker": "ETH-USD",
+    "timeframe": "1d-swing",
+    "strategy": "EMA20 retest + trend",
+    "prob": 0.66,
+    "entry": 2710,
+    "stop": 2580,
+    "targets": [
+      2790,
+      2860,
+      2950
+    ],
+    "trail": {
+      "method": "ema20_atr",
+      "atr_mult": 1.5
+    },
+    "asof": "2025-10-02 09:00:47"
+  }
 ]

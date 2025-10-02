@@ -1,522 +1,224 @@
 import React, { useEffect, useMemo, useState } from "react";
 
-/** Interactive + Safe:
- *  - Tabs (Intraday / Swing / Crypto)
- *  - Search
- *  - Manual Refresh
- *  - Auto-Refresh (toggle)
- *  - Watchlist (★) saved to localStorage + “Watch Only” filter
- *  - Pagination (12/page)
- *  - Card click → Detail Drawer with quick links (TradingView / Yahoo / CMC)
- *  - Auto-demo when feeds are empty so UI never looks dead
- */
+/** ---------- Types ---------- */
+type Intraday = {
+  ticker: string; timeframe: string; strategy: string; side: string;
+  prob: number; entry: number; stop: number; targets: number[]; asof?: string;
+};
+type Swing = {
+  ticker: string; timeframe: string; strategy: string;
+  prob: number; entry: number; stop: number; targets: number[]; asof?: string;
+};
+type OptionRow = {
+  symbol: string; type: "CALL" | "PUT"; strike: number; expiry: string;
+  delta: number; spread: number; note: string; score: number;
+};
+type SwingOpt = {
+  ticker: string; timeframe: string; prob: number; entry: number; stop: number;
+  targets: number[]; opt_type: string; opt_strike: number; opt_exp: string;
+  opt_delta: number; opt_note: string;
+};
 
-type Row = { symbol: string; note?: string; score?: number; raw?: any };
-
-// ---------- helpers ----------
-async function fetchJSON(url: string): Promise<any | null> {
+/** ---------- Safe fetch ---------- */
+async function fetchJSON<T>(url: string): Promise<T[]> {
   try {
-    const res = await fetch(url, { cache: "no-cache" });
-    if (!res.ok) return null;
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
-
-function normalize(raw: any): Row[] {
-  if (!raw) return [];
-  const arr = Array.isArray(raw)
-    ? raw
-    : Array.isArray(raw?.records)
-    ? raw.records
-    : Array.isArray(raw?.data)
-    ? raw.data
-    : Array.isArray(raw?.values)
-    ? raw.values
-    : [];
-  return arr.map(toRow);
-}
-
-function toRow(r: any): Row {
-  const symbol = String(r.ticker ?? r.symbol ?? r.SYMBOL ?? "");
-  const note =
-    (r.note ?? r.strategy ?? r.action ?? r.timeframe ?? "") || undefined;
-  let score: number | undefined = undefined;
-  if (typeof r.prob === "number") score = r.prob <= 1 ? r.prob * 100 : r.prob;
-  if (typeof r.score === "number") score = r.score;
-  if (typeof r.weekly_change === "number") score = r.weekly_change * 100; // crypto movers
-  return { symbol, note, score, raw: r };
-}
-
-function pct(n?: number) {
-  return n == null ? "" : `${n.toFixed(1)}%`;
-}
-
-const tvLink = (sym: string) =>
-  sym.includes("-USD")
-    ? `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(sym)}`
-    : `https://www.tradingview.com/symbols/${encodeURIComponent(sym)}`;
-const cmcLink = (sym: string) =>
-  `https://coinmarketcap.com/currencies/${sym.replace("-USD", "")}/`;
-const yfLink = (sym: string) =>
-  `https://finance.yahoo.com/quote/${encodeURIComponent(sym)}`;
-
-// watchlist storage
-const LSKEY = "logiq_watchlist";
-const loadWatch = () => {
-  try {
-    return JSON.parse(localStorage.getItem(LSKEY) || "[]") as string[];
+    const r = await fetch(url, { cache: "no-store" });
+    if (!r.ok) throw new Error(String(r.status));
+    return await r.json();
   } catch {
     return [];
   }
-};
-const saveWatch = (arr: string[]) =>
-  localStorage.setItem(LSKEY, JSON.stringify(arr));
-
-// CSV export
-function toCSV(rows: Row[]): string {
-  const header = ["symbol", "note", "score"].join(",");
-  const body = rows
-    .map((r) => [r.symbol, JSON.stringify(r.note ?? ""), r.score ?? ""].join(","))
-    .join("\n"); // <- keep on one line to avoid string errors
-  return header + "\n" + body;
 }
 
-// demo fallback (so UI never looks empty)
-const DEMO = {
-  intraday: [
-    { symbol: "BTC-USD", note: "ORB + EMA20", score: 72 },
-    { symbol: "ETH-USD", note: "EMA10/20 cross", score: 66 },
-  ],
-  swing: [{ symbol: "LINK-USD", note: "EMA20 retest", score: 68 }],
-  crypto: [
-    { symbol: "ARB-USD", note: "+7d", score: 22 },
-    { symbol: "ADA-USD", note: "-7d", score: -4 },
-  ],
+/** ---------- CSS (inline, stable) ---------- */
+const css = `
+:root {
+  --bg:#0b0b10; --ink:#e9eaf6; --muted:#9aa0a6; --panel:#14141d; --line:#2b2d3a;
+  --g1:#ff8a00; --g2:#ff3d6e; --g3:#6a5cff;
+}
+*{box-sizing:border-box} html,body,#root{height:100%} body{margin:0}
+.app{min-height:100%;background:radial-gradient(1200px 600px at 50% -20%,#1b1b27 0%,#0b0b10 60%,#0b0b10 100%);color:var(--ink);font-family:Inter,system-ui,Segoe UI,Arial,sans-serif}
+.container{max-width:1120px;margin:0 auto;padding:24px}
+.header{display:flex;align-items:center;gap:16px;justify-content:center;margin:6px 0 12px}
+.logo{width:92px;height:auto;filter:drop-shadow(0 6px 24px rgba(255,140,0,.38));animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.brand{text-align:center}
+.title{font-weight:900;font-size:40px;letter-spacing:.3px;background:linear-gradient(90deg,var(--g1),var(--g2),var(--g3));-webkit-background-clip:text;background-clip:text;color:transparent;margin:0}
+.subtitle{margin:4px 0 0;color:var(--muted);font-weight:500}
+
+.tabs{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:14px 0 18px}
+.tab{border:1px solid var(--line);background:#171823;padding:10px 14px;border-radius:10px;color:#dfe3ea;cursor:pointer;transition:.18s;user-select:none}
+.tab:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.tab.active{background:linear-gradient(90deg,var(--g1),var(--g2));border-color:transparent;color:white}
+
+.actions{display:flex;gap:10px;justify-content:flex-end;margin:8px 0 14px}
+.btn{padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:#181a23;color:#e9ebf6;cursor:pointer}
+.btn.grad{background:linear-gradient(90deg,var(--g1),var(--g2));border-color:transparent;color:#fff}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0}
+.empty{color:#a0a6ae;margin:10px 0;text-align:center}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.card{background:linear-gradient(180deg,#171722 0%,#111117 100%);border:1px solid #2a2a37;border-radius:14px;padding:14px;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+.row{display:flex;justify-content:space-between;margin:4px 0}
+.k{color:#9aa0a6;margin-right:6px}
+.badge{padding:3px 8px;border-radius:999px;border:1px solid #2f3140;background:#1a1b25;color:#cfd3e1;font-size:12px}
+.prob{font-weight:800}
+.targets{display:flex;gap:6px;flex-wrap:wrap}
+.target{padding:4px 8px;border-radius:8px;background:#1a1b25;border:1px solid #2d2f3c}
+.updated{color:#9aa0a6;font-size:12px;text-align:center;margin-top:8px}
+`;
+
+/** ---------- helpers ---------- */
+const fmt = (n: number | string, d=2) => {
+  const x = typeof n === "number" ? n : parseFloat(String(n));
+  return isFinite(x) ? x.toFixed(d) : String(n);
+};
+const csv = (name: string, rows: any[]) => {
+  if (!rows.length) return;
+  const cols = Object.keys(rows[0]);
+  const body = rows.map(r => cols.map(c => JSON.stringify(r[c] ?? "")).join(",")).join("\n");
+  const blob = new Blob([cols.join(",")+"\n"+body], { type:"text/csv" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name + ".csv"; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
 };
 
-// ---------- Drawer ----------
-function Drawer({
-  row,
-  onClose,
-}: {
-  row: Row | null;
-  onClose: () => void;
-}) {
-  if (!row) return null;
-  return (
-    <div
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,.55)",
-        display: "flex",
-        justifyContent: "flex-end",
-        zIndex: 50,
-      }}
-    >
-      <div
-        style={{
-          width: "min(520px,92vw)",
-          height: "100%",
-          background: "#0b0b0c",
-          borderLeft: "1px solid #27272a",
-          padding: 18,
-          color: "#fff",
-          overflow: "auto",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 12,
-          }}
-        >
-          <h3 style={{ margin: 0 }}>{row.symbol}</h3>
-          <button
-            onClick={onClose}
-            style={{
-              padding: "6px 10px",
-              borderRadius: 8,
-              border: "1px solid #3f3f46",
-              background: "rgba(24,24,27,.7)",
-              color: "#fff",
-              cursor: "pointer",
-            }}
-          >
-            Close
-          </button>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "120px 1fr",
-            rowGap: 8,
-            columnGap: 10,
-            marginBottom: 12,
-          }}
-        >
-          <div style={{ color: "#a1a1aa" }}>Confidence</div>
-          <div style={{ fontWeight: 700 }}>{pct(row.score)}</div>
-          <div style={{ color: "#a1a1aa" }}>Note</div>
-          <div>{row.note || "—"}</div>
-        </div>
-
-        <div style={{ marginBottom: 10, color: "#a1a1aa" }}>Quick Links</div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-          <a
-            href={tvLink(row.symbol)}
-            target="_blank"
-            rel="noreferrer"
-            style={btn()}
-          >
-            TradingView
-          </a>
-          <a href={yfLink(row.symbol)} target="_blank" rel="noreferrer" style={btn()}>
-            Yahoo Finance
-          </a>
-          {row.symbol.includes("-USD") && (
-            <a
-              href={cmcLink(row.symbol)}
-              target="_blank"
-              rel="noreferrer"
-              style={btn()}
-            >
-              CoinMarketCap
-            </a>
-          )}
-          <button
-            style={btn()}
-            onClick={() => navigator.clipboard.writeText(row.symbol)}
-          >
-            Copy Symbol
-          </button>
-        </div>
-
-        <div style={{ marginBottom: 6, color: "#a1a1aa" }}>Raw</div>
-        <pre
-          style={{
-            background: "#0f0f12",
-            border: "1px solid #27272a",
-            borderRadius: 12,
-            padding: 12,
-            maxHeight: 300,
-            overflow: "auto",
-          }}
-        >
-{JSON.stringify(row.raw ?? {}, null, 2)}
-        </pre>
-      </div>
-    </div>
-  );
-}
-
-const btn = () => ({
-  padding: "8px 12px",
-  borderRadius: 8,
-  border: "1px solid #3f3f46",
-  background: "rgba(24,24,27,.7)",
-  color: "#fff",
-  cursor: "pointer",
-});
-
-// ---------- Main ----------
+/** ---------- App ---------- */
 export default function App() {
-  const [tab, setTab] = useState<"intraday" | "swing" | "crypto">("intraday");
-  const [q, setQ] = useState("");
-  const [rows, setRows] = useState<Row[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState<"Intraday"|"Swing"|"Options"|"Swing+Options">("Intraday");
+  const [intraday, setIntraday] = useState<Intraday[]>([]);
+  const [swing, setSwing] = useState<Swing[]>([]);
+  const [opt, setOpt] = useState<OptionRow[]>([]);
+  const [sx, setSx] = useState<SwingOpt[]>([]);
 
-  const [auto, setAuto] = useState(true);
-  const [watch, setWatch] = useState<string[]>(loadWatch());
-  const [onlyWatch, setOnlyWatch] = useState(false);
-
-  const [page, setPage] = useState(1);
-  const pageSize = 12;
-
-  const [open, setOpen] = useState<Row | null>(null);
-
-  const load = async () => {
-    setLoading(true);
-    let url = "/signals.json";
-    if (tab === "swing") url = "/signals_swing.json";
-    if (tab === "crypto") url = "/crypto_movers.json";
-    const raw = await fetchJSON(url);
-    const data = normalize(raw);
-    setRows(data.length ? data : DEMO[tab]); // auto-demo if empty
-    setLoading(false);
-    setPage(1);
-  };
-
-  // initial + on tab change
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab]);
+    fetchJSON<Intraday>("/signals.json").then(setIntraday);
+    fetchJSON<Swing>("/signals_swing.json").then(setSwing);
+    fetchJSON<OptionRow>("/options.json").then(setOpt);
+    fetchJSON<SwingOpt>("/swing_plus_options.json").then(setSx);
+  }, []);
 
-  // auto-refresh
-  useEffect(() => {
-    if (!auto) return;
-    const id = setInterval(load, 60_000);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auto, tab]);
-
-  const filtered = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    let list = rows.filter(
-      (r) => !term || r.symbol.toLowerCase().includes(term)
-    );
-    if (onlyWatch) list = list.filter((r) => watch.includes(r.symbol));
-    // sort by score desc (fallback to -inf when missing)
-    list = list.sort((a, b) => (b.score ?? -1e9) - (a.score ?? -1e9));
-    return list;
-  }, [rows, q, onlyWatch, watch]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
-
-  const toggleWatch = (sym: string) => {
-    setWatch((prev) => {
-      const next = prev.includes(sym)
-        ? prev.filter((s) => s !== sym)
-        : [...prev, sym];
-      saveWatch(next);
-      return next;
-    });
-  };
+  const updated = useMemo(() => {
+    const ts: string[] = [];
+    const take = (s?: string) => s && ts.push(s);
+    intraday.forEach(r=>take(r.asof)); swing.forEach(r=>take(r.asof));
+    return ts.sort().slice(-1)[0] || "";
+  }, [intraday, swing]);
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background:
-          "radial-gradient(1200px 800px at 20% -10%, rgba(255,215,0,.10), transparent)," +
-          "radial-gradient(1200px 800px at 80% 110%, rgba(147,51,234,.10), transparent), #000",
-        color: "#fff",
-        padding: 24,
-        fontFamily:
-          "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
-      }}
-    >
-      {/* Header */}
-      <header style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <img
-          src="/logo.png"
-          alt="Logo"
-          style={{
-            width: 96,
-            height: 96,
-            animation: "pulse 2s infinite",
-            filter:
-              "brightness(1.2) drop-shadow(0 0 12px rgba(255,215,0,0.28))",
-            borderRadius: 12,
-            objectFit: "contain",
-          }}
-        />
-        <h1
-          style={{
-            fontSize: 36,
-            fontWeight: 800,
-            background: "linear-gradient(90deg,#ffd700,#f79d00,#d977ff)",
-            WebkitBackgroundClip: "text",
-            color: "transparent",
-            margin: 0,
-          }}
-        >
-          Logiq Signals
-        </h1>
-      </header>
-
-      {/* Tabs + Controls */}
-      <nav style={{ marginTop: 20, display: "flex", gap: 10, flexWrap: "wrap" }}>
-        {["intraday", "swing", "crypto"].map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t as any)}
-            style={{
-              padding: "8px 12px",
-              borderRadius: 8,
-              border: "1px solid #3f3f46",
-              background:
-                tab === t ? "linear-gradient(90deg,#ffd700,#f79d00)" : "rgba(24,24,27,.7)",
-              color: tab === t ? "#000" : "#fff",
-              cursor: "pointer",
-              fontWeight: 700,
-            }}
-          >
-            {t.toUpperCase()}
-          </button>
-        ))}
-
-        <input
-          placeholder="Search symbol…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          style={{
-            marginLeft: "auto",
-            padding: "8px 12px",
-            borderRadius: 8,
-            border: "1px solid #3f3f46",
-            background: "rgba(9,9,11,.6)",
-            color: "#fff",
-            outline: "none",
-            minWidth: 180,
-          }}
-        />
-        <button onClick={load} style={btn()}>
-          {loading ? "Loading…" : "Refresh"}
-        </button>
-        <button onClick={() => setAuto((v) => !v)} style={btn()}>
-          Auto: {auto ? "On" : "Off"}
-        </button>
-        <button onClick={() => setOnlyWatch((v) => !v)} style={btn()}>
-          {onlyWatch ? "Watch: Only" : "Watch: All"}
-        </button>
-        <button
-          onClick={() => {
-            const csv = toCSV(filtered);
-            const blob = new Blob([csv], { type: "text/csv" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `${tab}.csv`;
-            a.click();
-            setTimeout(() => URL.revokeObjectURL(url), 500);
-          }}
-          style={btn()}
-        >
-          Export CSV
-        </button>
-      </nav>
-
-      {/* Cards */}
-      <main
-        style={{
-          marginTop: 20,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-          gap: 14,
-        }}
-      >
-        {pageRows.map((r) => (
-          <div
-            key={r.symbol}
-            onClick={() => setOpen(r)}
-            style={{
-              border: "1px solid rgba(63,63,70,.8)",
-              background: "rgba(24,24,27,.7)",
-              padding: 16,
-              borderRadius: 14,
-              cursor: "pointer",
-            }}
-            title="Open details"
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 6,
-                gap: 8,
-              }}
-            >
-              <strong>{r.symbol}</strong>
-              <span
-                style={{
-                  fontSize: 12,
-                  fontWeight: 800,
-                  color: (r.score ?? 0) >= 60 ? "#34d399" : "#f87171",
-                }}
-              >
-                {pct(r.score)}
-              </span>
-            </div>
-            <div style={{ fontSize: 13, color: "#a1a1aa", marginBottom: 10 }}>
-              {r.note || "—"}
-            </div>
-            {/* watch star */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <span style={{ color: "#a1a1aa", fontSize: 12 }}>
-                Click for details
-              </span>
-              <span
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleWatch(r.symbol);
-                }}
-                style={{ fontSize: 16, userSelect: "none", cursor: "pointer" }}
-              >
-                {watch.includes(r.symbol) ? "★" : "☆"}
-              </span>
-            </div>
+    <div className="app">
+      <style>{css}</style>
+      <div className="container">
+        {/* header */}
+        <div className="header">
+          <img src="/logo.png" alt="logo" className="logo" />
+          <div className="brand">
+            <h1 className="title">Logiq Signals</h1>
+            <p className="subtitle">Intraday • Swing • Options • Crypto</p>
           </div>
-        ))}
-        {pageRows.length === 0 && (
-          <div
-            style={{
-              border: "1px solid rgba(63,63,70,.8)",
-              background: "rgba(24,24,27,.7)",
-              padding: 20,
-              borderRadius: 14,
-              textAlign: "center",
-              gridColumn: "1/-1",
-            }}
-          >
-            No results. Clear search or refresh.
-          </div>
+        </div>
+
+        {/* tabs */}
+        <div className="tabs">
+          {(["Intraday","Swing","Options","Swing+Options"] as const).map(t=>(
+            <button key={t} className={`tab ${tab===t?"active":""}`} onClick={()=>setTab(t)}>{t}</button>
+          ))}
+        </div>
+
+        {/* actions */}
+        <div className="actions">
+          {tab==="Intraday" && <button className="btn" onClick={()=>csv("intraday", intraday)}>Export CSV</button>}
+          {tab==="Swing"    && <button className="btn" onClick={()=>csv("swing", swing)}>Export CSV</button>}
+          {tab==="Options"  && <button className="btn" onClick={()=>csv("options", opt)}>Export CSV</button>}
+          {tab==="Swing+Options" && <button className="btn" onClick={()=>csv("swing_plus_options", sx)}>Export CSV</button>}
+          <a className="btn grad" href="mailto:hello@logiqsignals.com?subject=Subscribe">Subscribe</a>
+        </div>
+
+        {/* panes */}
+        {tab==="Intraday" && (
+          <section className="panel">
+            {!intraday.length && <p className="empty">No intraday signals yet.</p>}
+            {!!intraday.length && (
+              <div className="grid">
+                {intraday.map((r,i)=>(
+                  <div className="card" key={i}>
+                    <div className="row"><strong>{r.ticker}</strong> <span className="badge">{r.timeframe}</span></div>
+                    <div className="row"><span className="k">Strategy</span><span>{r.strategy}</span></div>
+                    <div className="row"><span className="k">Side</span><span className="badge">{r.side}</span></div>
+                    <div className="row"><span className="k">Entry</span><span>{fmt(r.entry)}</span></div>
+                    <div className="row"><span className="k">Stop</span><span>{fmt(r.stop)}</span></div>
+                    <div className="row"><span className="k">Prob</span><span className="prob">{Math.round(r.prob*100)}%</span></div>
+                    <div className="targets">{r.targets?.map((t,j)=>(<span key={j} className="target">T{j+1}: {fmt(t)}</span>))}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         )}
-      </main>
 
-      {/* Pager */}
-      <div
-        style={{
-          display: "flex",
-          gap: 10,
-          alignItems: "center",
-          marginTop: 14,
-          flexWrap: "wrap",
-        }}
-      >
-        <button
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          style={btn()}
-          disabled={page <= 1}
-        >
-          Prev
-        </button>
-        <span style={{ color: "#a1a1aa", fontSize: 12 }}>
-          Page {page} / {totalPages}
-        </span>
-        <button
-          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          style={btn()}
-          disabled={page >= totalPages}
-        >
-          Next
-        </button>
+        {tab==="Swing" && (
+          <section className="panel">
+            {!swing.length && <p className="empty">No swing signals yet.</p>}
+            {!!swing.length && (
+              <div className="grid">
+                {swing.map((r,i)=>(
+                  <div className="card" key={i}>
+                    <div className="row"><strong>{r.ticker}</strong> <span className="badge">{r.timeframe}</span></div>
+                    <div className="row"><span className="k">Strategy</span><span>{r.strategy}</span></div>
+                    <div className="row"><span className="k">Entry</span><span>{fmt(r.entry)}</span></div>
+                    <div className="row"><span className="k">Stop</span><span>{fmt(r.stop)}</span></div>
+                    <div className="row"><span className="k">Prob</span><span className="prob">{Math.round(r.prob*100)}%</span></div>
+                    <div className="targets">{r.targets?.map((t,j)=>(<span key={j} className="target">T{j+1}: {fmt(t)}</span>))}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {tab==="Options" && (
+          <section className="panel">
+            {!opt.length && <p className="empty">No options today.</p>}
+            {!!opt.length && (
+              <div className="grid">
+                {opt.map((r,i)=>(
+                  <div className="card" key={i}>
+                    <div className="row"><strong>{r.symbol}</strong> <span className="badge">{r.type}</span></div>
+                    <div className="row"><span className="k">Strike</span><span>{r.strike}</span></div>
+                    <div className="row"><span className="k">Expiry</span><span>{r.expiry}</span></div>
+                    <div className="row"><span className="k">Delta</span><span>{fmt(r.delta,2)}</span></div>
+                    <div className="row"><span className="k">Spread</span><span>{fmt(r.spread,2)}</span></div>
+                    <div className="row"><span className="k">Score</span><span className="prob">{Math.round((r.score||0)*100)}%</span></div>
+                    <div className="row"><span className="k">Note</span><span>{r.note}</span></div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {tab==="Swing+Options" && (
+          <section className="panel">
+            {!sx.length && <p className="empty">No linked swing+options yet.</p>}
+            {!!sx.length && (
+              <div className="grid">
+                {sx.map((r,i)=>(
+                  <div className="card" key={i}>
+                    <div className="row"><strong>{r.ticker}</strong> <span className="badge">{r.timeframe}</span></div>
+                    <div className="row"><span className="k">Entry/Stop</span><span>{fmt(r.entry)}/{fmt(r.stop)}</span></div>
+                    <div className="targets">{r.targets?.map((t,j)=>(<span key={j} className="target">T{j+1}: {fmt(t)}</span>))}</div>
+                    <div className="row"><span className="k">Option</span><span>{r.opt_type} {r.opt_strike} {r.opt_exp}</span></div>
+                    <div className="row"><span className="k">Delta</span><span>{fmt(r.opt_delta,2)}</span></div>
+                    <div className="row"><span className="k">Note</span><span>{r.opt_note}</span></div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        <div className="updated">{updated ? `Last updated: ${updated}` : "Demo mode or missing timestamps"}</div>
       </div>
-
-      {/* Drawer */}
-      <Drawer row={open} onClose={() => setOpen(null)} />
-
-      {/* pulse keyframes */}
-      <style>
-        {`@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.06);opacity:.9}}`}
-      </style>
     </div>
   );
 }

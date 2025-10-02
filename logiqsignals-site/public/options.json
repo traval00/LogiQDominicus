@@ -1,0 +1,22 @@
+[
+  {
+    "symbol": "SPY",
+    "type": "CALL",
+    "strike": 515,
+    "expiry": "2025-10-18",
+    "delta": 0.62,
+    "spread": 0.03,
+    "note": "ATM call 2w \u2014 trend up",
+    "score": 0.72
+  },
+  {
+    "symbol": "AAPL",
+    "type": "PUT",
+    "strike": 220,
+    "expiry": "2025-10-18",
+    "delta": 0.55,
+    "spread": 0.02,
+    "note": "EMA20 loss risk hedge",
+    "score": 0.64
+  }
+]

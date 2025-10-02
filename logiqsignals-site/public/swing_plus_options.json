@@ -1,0 +1,19 @@
+[
+  {
+    "ticker": "AAPL",
+    "timeframe": "1d-swing",
+    "prob": 0.63,
+    "entry": 224.1,
+    "stop": 218.7,
+    "targets": [
+      229.5,
+      232.9,
+      236.3
+    ],
+    "opt_type": "PUT",
+    "opt_strike": 220,
+    "opt_exp": "2025-10-18",
+    "opt_delta": 0.55,
+    "opt_note": "EMA20 loss risk hedge"
+  }
+]
