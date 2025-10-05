@@ -1,61 +1,121 @@
-# crypto_movers.py
-# Finds top weekly crypto movers and appends them to config.yaml (dedup). Quiet & robust.
-
-import warnings
-warnings.filterwarnings("ignore", category=FutureWarning)
-
-import yaml, yfinance as yf
+import json, datetime as dt
 from pathlib import Path
-import pandas as pd
+import requests
 
 ROOT = Path(__file__).resolve().parent
-CFG_PATH = ROOT / "config.yaml"
-OUT = ROOT / "output"; OUT.mkdir(exist_ok=True)
+OUT = ROOT / "output"
+OUT.mkdir(exist_ok=True)
 
-# Base universe to scan (deduped)
-BASE = sorted(set([
-    "BTC-USD","ETH-USD","SOL-USD","XRP-USD","DOGE-USD","SHIB-USD","ADA-USD","AVAX-USD",
-    "MATIC-USD","LINK-USD","INJ-USD","NEAR-USD","APT-USD","SUI-USD","FTM-USD","SEI-USD",
-    "TIA-USD","JUP-USD","WIF-USD","FLOKI-USD","PYTH-USD","ARB-USD","STRK-USD","RUNE-USD",
-    "ATOM-USD","ETC-USD","HBAR-USD","GRT-USD","AR-USD","RNDR-USD"
-]))
+# Map CoinGecko coin IDs -> display symbols your UI expects
+ID_TO_TICKER = {
+    "bitcoin": "BTC-USD",
+    "ethereum": "ETH-USD",
+    "solana": "SOL-USD",
+    "ripple": "XRP-USD",
+    "cardano": "ADA-USD",
+    "dogecoin": "DOGE-USD",
+    "avalanche-2": "AVAX-USD",
+    "chainlink": "LINK-USD",
+    "litecoin": "LTC-USD",
+    "polkadot": "DOT-USD",
+    "binancecoin": "BNB-USD",
+    "tron": "TRX-USD",
+    "polygon": "MATIC-USD",
+    "cosmos": "ATOM-USD",
+    "uniswap": "UNI-USD",
+    "arbitrum": "ARB-USD",
+    "internet-computer": "ICP-USD",
+    "near": "NEAR-USD",
+    "filecoin": "FIL-USD",
+    "stacks": "STX-USD",
+    "optimism": "OP-USD",
+    "aptos": "APT-USD",
+    "sui": "SUI-USD",
+    "render-token": "RNDR-USD",
+    "injective-protocol": "INJ-USD",
+    "hedera-hashgraph": "HBAR-USD",
+    "the-graph": "GRT-USD",
+    "shiba-inu": "SHIB-USD",
+    "pyth-network": "PYTH-USD",
+    "theta-token": "THETA-USD",
+}
 
-def weekly_change(ticker: str):
+# You can trim/expand this list. We'll fetch a larger page and filter to these if present.
+TARGET_IDS = list(ID_TO_TICKER.keys())
+
+CG_URL = "https://api.coingecko.com/api/v3/coins/markets"
+
+def fetch_markets(page_size=100):
+    """
+    Pull market data from CoinGecko.
+    We ask for top 100 by market cap, then we filter to TARGET_IDS if present.
+    """
+    params = {
+        "vs_currency": "usd",
+        "order": "market_cap_desc",
+        "per_page": page_size,
+        "page": 1,
+        "sparkline": "false",
+        "price_change_percentage": "24h",
+    }
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "LogiqSignals/1.0 (+https://logiqsignals.com)"
+    }
+    r = requests.get(CG_URL, params=params, headers=headers, timeout=20)
+    r.raise_for_status()
+    return r.json()
+
+def to_row(item: dict):
+    """
+    Map CoinGecko market item to our row format.
+    """
+    cid = item.get("id")
+    symbol = ID_TO_TICKER.get(cid, (item.get("symbol","") or "").upper() + "-USD")
+    price = item.get("current_price") or 0.0
+    chg = item.get("price_change_percentage_24h") or 0.0
+    vol = item.get("total_volume") or 0.0
+    return {
+        "symbol": symbol,
+        "price": round(float(price), 2),
+        "change24h": round(float(chg), 2),
+        "vol24h": round(float(vol), 2),
+        "asof": dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
+    }
+
+def main():
     try:
-        df = yf.download(ticker, period="15d", interval="1d", auto_adjust=True, progress=False)
-        if df.empty or "Close" not in df.columns or len(df["Close"].dropna()) < 8:
-            return None
-        close = df["Close"].dropna()
-        # scalar % change over ~7 trading days
-        chg = float(close.iloc[-1] / close.iloc[-8] - 1.0)
-        return chg
-    except Exception:
-        return None
+        data = fetch_markets(page_size=100)  # big page, then filter
+    except Exception as e:
+        # Write an empty but valid file so UI won't crash
+        (OUT / "crypto_movers.json").write_text("[]")
+        print(f"[ERR] CoinGecko fetch failed: {e}")
+        return
 
-def main(top_n=12):
-    rows = []
-    for t in BASE:
-        chg = weekly_change(t)
-        if chg is not None:
-            rows.append({"ticker": t, "weekly_change": chg})
+    # Prefer our TARGET_IDS, but if some missing, still include others
+    by_id = {d.get("id"): d for d in data if isinstance(d, dict)}
+    selected = []
 
-    if not rows:
-        print("No movers found."); return
+    # First pass: take requested IDs if available
+    for cid in TARGET_IDS:
+        if cid in by_id:
+            selected.append(by_id[cid])
 
-    df = pd.DataFrame(rows).sort_values("weekly_change", ascending=False).reset_index(drop=True)
-    movers = df.head(top_n)["ticker"].tolist()
+    # If we still have less than 20, top up with the biggest movers by abs 24h %
+    if len(selected) < 20:
+        # exclude ones already selected
+        existing = set(d.get("id") for d in selected)
+        remaining = [d for d in data if d.get("id") not in existing]
+        remaining.sort(key=lambda x: abs(x.get("price_change_percentage_24h") or 0.0), reverse=True)
+        selected += remaining[: max(0, 20 - len(selected))]
 
-    # Save a readable report
-    df.to_json(OUT / "crypto_movers.json", orient="records", indent=2)
-    print(f"Top {top_n} movers:", movers)
+    # Convert to rows and sort by |change| descending
+    rows = [to_row(d) for d in selected]
+    rows.sort(key=lambda x: abs(x.get("change24h", 0.0)), reverse=True)
+    rows = rows[:20]
 
-    # Append to config symbols_crypto (dedup)
-    cfg = yaml.safe_load(CFG_PATH.read_text())
-    current = list(cfg.get("symbols_crypto", []))
-    merged = sorted(set(current + movers))
-    cfg["symbols_crypto"] = merged
-    CFG_PATH.write_text(yaml.safe_dump(cfg, sort_keys=False))
-    print(f"Appended movers to config.yaml (symbols_crypto now {len(merged)} items).")
+    (OUT / "crypto_movers.json").write_text(json.dumps(rows, indent=2))
+    print(f"[OK] wrote {len(rows)} crypto movers -> {OUT/'crypto_movers.json'}")
 
 if __name__ == "__main__":
     main()

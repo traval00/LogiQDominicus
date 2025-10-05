@@ -1,186 +1,156 @@
 # run_swing.py
-# Swing (1–2 weeks) signals on daily bars. Uses models/model_swing.pkl (10-feature daily)
-# and falls back to heuristic if the model or features don't line up.
-
-import numpy as np
+import json, math, datetime as dt
+from pathlib import Path
 import pandas as pd
 import yfinance as yf
-import yaml, joblib
-from pathlib import Path
-from ta.momentum import RSIIndicator
-from ta.volatility import AverageTrueRange
 
 ROOT = Path(__file__).resolve().parent
-CFG = yaml.safe_load((ROOT / "config.yaml").read_text())
-MODELS = ROOT / "models"
-OUT = ROOT / "output"
-OUT.mkdir(exist_ok=True)
+OUT  = ROOT / "output"; OUT.mkdir(exist_ok=True)
 
-FAST, MID, SLOW = CFG["ema_fast"], CFG["ema_mid"], CFG["ema_slow"]
-SYMS = CFG["symbols_equity"] + CFG["symbols_crypto"]
-MIN_PROB = float(CFG.get("swing_min_prob", 0.65))
-MIN_RR = float(CFG.get("swing_min_rr", 1.4))
-TREND_CONFIRM = bool(CFG.get("swing_trend_confirm", True))
-RETEST_REQUIRED = bool(CFG.get("swing_retest_required", True))
-MIN_AVG_VOL = float(CFG.get("swing_min_avg_vol", 0.0))
+EQUITIES = ["SPY","QQQ","NVDA","AAPL","MSFT","META","TSLA","AMD","AMZN","GOOGL","NFLX","MU","SMCI","AVGO"]
+CRYPTOS  = ["BTC-USD","ETH-USD","SOL-USD","XRP-USD","DOGE-USD","ADA-USD","AVAX-USD","LINK-USD","LTC-USD","DOT-USD"]
 
-FEATS_SWING = [
-    "ret1","ret3","ret5",
-    "ema10","ema20","ema200",
-    "ema_slope20","ema_dist20",
-    "rsi","atr"
-]
-
-def _norm_cols(df):
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = ['_'.join([str(x) for x in tup if str(x)!='']) for tup in df.columns]
-    df.columns = [str(c).strip() for c in df.columns]
-    return df
-
-def _get_series(df: pd.DataFrame, candidates) -> pd.Series:
-    cols = [str(c).lower() for c in df.columns]
-    for name in candidates:
-        key = name.lower()
-        if key in cols:
-            s = df.iloc[:, cols.index(key)]
-            return s.squeeze() if hasattr(s, "squeeze") else s
-        for i, c in enumerate(cols):
-            if c == f"{key}_spy" or c.endswith(f"_{key}") or c.startswith(f"{key}_") or key in c:
-                s = df.iloc[:, i]
-                return s.squeeze() if hasattr(s, "squeeze") else s
-    raise KeyError(f"Missing any of {candidates} in {list(df.columns)}")
-
-def fetch1d(ticker: str, period="12mo"):
-    df = yf.download(ticker, period=period, interval="1d", auto_adjust=True, progress=False)
-    return _norm_cols(df) if not df.empty else df
-
-def enrich(raw: pd.DataFrame) -> pd.DataFrame:
-    if raw.empty:
-        return raw
-    c = _get_series(raw, ["close","adj close","adj_close","adjclose"])
-    h = _get_series(raw, ["high"])
-    l = _get_series(raw, ["low"])
-
-    df = pd.DataFrame(index=raw.index)
-    df["close"] = pd.to_numeric(c, errors="coerce")
-    df["high"]  = pd.to_numeric(h, errors="coerce")
-    df["low"]   = pd.to_numeric(l, errors="coerce")
-
-    df["ema10"]  = df["close"].ewm(span=FAST, adjust=False).mean()
-    df["ema20"]  = df["close"].ewm(span=MID,  adjust=False).mean()
-    df["ema200"] = df["close"].ewm(span=SLOW, adjust=False).mean()
-    df["ema_slope20"] = df["ema20"].diff()
-    df["ema_dist20"]  = (df["close"] - df["ema20"]) / df["ema20"]
-
-    df["rsi"] = RSIIndicator(df["close"], window=CFG["rsi_len"]).rsi()
-    df["atr"] = AverageTrueRange(df["high"], df["low"], df["close"], window=CFG["atr_len"]).average_true_range()
-
-    df["ret1"] = df["close"].pct_change(1)
-    df["ret3"] = df["close"].pct_change(3)
-    df["ret5"] = df["close"].pct_change(5)
-
-    return df.replace([np.inf,-np.inf], np.nan).dropna()
-
-def load_daily_model():
-    p = MODELS / "model_swing.pkl"
-    return joblib.load(p) if p.exists() else None
-
-def passes_filters(df: pd.DataFrame) -> bool:
-    last = df.iloc[-1]
-    if TREND_CONFIRM and not (last["close"] > last["ema20"] > last["ema200"]):
-        return False
-    if RETEST_REQUIRED:
-        near = ((df.tail(5)["close"] - df.tail(5)["ema20"]).abs() / df.tail(5)["ema20"]) <= 0.01
-        if not bool(near.any()):
-            return False
-    return True
-
-def avg_vol_ok(ticker: str) -> bool:
-    if "-USD" in ticker:
-        return True
+def now_utc():
     try:
-        hist = yf.download(ticker, period="3mo", interval="1d", auto_adjust=True, progress=False)
-        if hist.empty:
-            return True
-        hist = _norm_cols(hist)
-        cols_lower = [str(c).lower() for c in hist.columns]
-        vol_col = None
-        for cand in ["volume","volume_close","vol","volumetotal"]:
-            if cand in cols_lower:
-                vol_col = hist.columns[cols_lower.index(cand)]
-                break
-        if vol_col is None:
-            for i, c in enumerate(cols_lower):
-                if "volume" in c:
-                    vol_col = hist.columns[i]; break
-        if vol_col is None:
-            return True
-        vs = hist[vol_col]
-        if hasattr(vs, "ndim") and vs.ndim == 2:
-            vs = vs.iloc[:, -1]
-        return float(vs.tail(20).mean()) >= MIN_AVG_VOL
+        return dt.datetime.now(dt.timezone.utc)
     except Exception:
-        return True
+        return dt.datetime.utcnow()
+
+def fetch_daily(tkr: str, period="1y"):
+    try:
+        df = yf.download(tkr, period=period, interval="1d", auto_adjust=True, progress=False, group_by="ticker")
+        if isinstance(df.columns, pd.MultiIndex):
+            colmap = {}
+            for (price, _sym) in df.columns:
+                colmap[(price, _sym)] = price.lower()
+            df = df.rename(columns=colmap)
+            df = df[["open","high","low","close","volume"]]
+        else:
+            lower = {c:c.lower() for c in df.columns}
+            df = df.rename(columns=lower)
+            df = df[["open","high","low","close","volume"]]
+        df = df.dropna()
+        return df
+    except Exception as e:
+        print(f"[ERR] {tkr}: download failed: {e}")
+        return pd.DataFrame()
+
+def ema(s, n): return s.ewm(span=n, adjust=False).mean()
+
+def enrich(df: pd.DataFrame):
+    if df.empty: return df
+    for c in ["open","high","low","close","volume"]:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+    df = df.dropna(subset=["close"])
+    if df.empty: return df
+    df["ema10"]  = ema(df["close"], 10)
+    df["ema20"]  = ema(df["close"], 20)
+    df["ema200"] = ema(df["close"], 200)
+    tr = (df["high"]-df["low"]).abs()
+    tr1= (df["high"]-df["close"].shift()).abs()
+    tr2= (df["low"] -df["close"].shift()).abs()
+    df["atr"] = pd.concat([tr,tr1,tr2], axis=1).max(axis=1).rolling(14).mean()
+    return df.dropna()
+
+def dv_ok(df: pd.DataFrame, min_dv=1_000_000):
+    try:
+        dv = (df["close"]*df["volume"]).tail(20).mean()
+        return float(dv) >= min_dv
+    except Exception:
+        return False
+
+def next_earnings(tkr: str):
+    try:
+        info = yf.Ticker(tkr).get_earnings_dates(limit=1)
+        if info is None or info.empty: return None
+        d = pd.to_datetime(info.index[0]).date()
+        return d.isoformat()
+    except Exception:
+        return None
+
+def guardrails(sym, is_equity: bool):
+    note = []
+    if is_equity:
+        ed = next_earnings(sym)
+        if ed:
+            try:
+                ed_date = dt.date.fromisoformat(ed)
+                days = (ed_date - now_utc().date()).days
+                if days >= 0 and days <= 5:
+                    note.append(f"earnings in {days}d")
+                    return False, "; ".join(note)
+                else:
+                    note.append(f"earnings {days}d out")
+            except Exception:
+                pass
+    return True, "; ".join(note)
+
+def swing_score(row):
+    # basic momentum + trend alignment
+    bias = 0
+    if row["close"] > row["ema20"] > row["ema200"]: bias += 1
+    if row["close"] < row["ema20"] < row["ema200"]: bias -= 1
+    dist20 = (row["close"] - row["ema20"]) / row["ema20"]
+    base = 0.55 + 0.2*(1 if bias>0 else (-1 if bias<0 else 0)) - 0.1*abs(dist20)
+    return max(0.0, min(1.0, base))
+
+def build_row(sym, last, direction, score, note):
+    price = float(last["close"]); atr=float(last["atr"])
+    if direction=="LONG":
+        stop = max(float(last["ema20"]), price-2*atr)
+        rr_risk = max(0.01, price-stop)
+        targets = [round(price + k*rr_risk,4) for k in (1,2,3)]
+    else:
+        stop = min(float(last["ema20"]), price+2*atr)
+        rr_risk = max(0.01, stop-price)
+        targets = [round(price - k*rr_risk,4) for k in (1,2,3)]
+    return {
+        "symbol": sym,
+        "timeframe":"1d-swing",
+        "strategy":"EMA break & retest",
+        "direction": direction,
+        "score": round(float(score),3),
+        "entry": round(price,4),
+        "stop": round(float(stop),4),
+        "targets": targets,
+        "trail":{"method":"atr","mult":2.0},
+        "note": note,
+        "asof": now_utc().strftime("%Y-%m-%d %H:%M:%S UTC")
+    }
 
 def main():
-    model_pack = load_daily_model()
-    out = []
-
-    for sym in SYMS:
-        if not avg_vol_ok(sym):
+    rows=[]
+    # equities
+    for sym in EQUITIES:
+        df = enrich(fetch_daily(sym,"1y"))
+        if df.empty or not dv_ok(df):
+            print(f"[WARN] {sym}: no daily data normalized; skipping")
             continue
-
-        base = enrich(fetch1d(sym))
-        if base.empty or len(base) < 80:
+        allow, note = guardrails(sym, True)
+        if not allow:
+            print(f"[GUARD] {sym}: {note} -> skip")
             continue
-
-        # default heuristic probability
-        last = base.iloc[-1]
-        heur_proba = 0.65 if (last["close"] > last["ema20"] > last["ema200"] and 45 <= last["rsi"] <= 70) else 0.4
-        proba = heur_proba
-
-        # try daily model if present & features match
-        try:
-            if model_pack and isinstance(model_pack, dict):
-                model = model_pack.get("model")
-                feats = model_pack.get("feats", [])
-                X = base[FEATS_SWING].iloc[[-1]]
-                if model and feats and feats == FEATS_SWING:
-                    proba = float(model.predict_proba(X)[0,1])
-        except Exception:
-            proba = heur_proba
-
-        if proba < MIN_PROB:
+        last = df.iloc[-1]
+        sc = swing_score(last)
+        if sc >= 0.60:
+            direction = "LONG" if last["close"]>last["ema20"] else "SHORT"
+            rows.append(build_row(sym, last, direction, sc, note))
+    # crypto (no earnings guard)
+    for sym in CRYPTOS:
+        df = enrich(fetch_daily(sym,"1y"))
+        if df.empty:
+            print(f"[WARN] {sym}: no daily crypto normalized; skipping")
             continue
-        if not passes_filters(base):
-            continue
+        last = df.iloc[-1]
+        sc = swing_score(last)
+        if sc >= 0.60:
+            direction = "LONG" if last["close"]>last["ema20"] else "SHORT"
+            rows.append(build_row(sym, last, direction, sc, ""))
 
-        price = float(last["close"])
-        stop  = float(min(last["ema20"], base["low"].tail(3).min()))
-        risk  = price - stop
-        if risk <= 0:
-            continue
-
-        t1 = round(price + 1.0 * risk, 4)
-        t2 = round(price + 2.0 * risk, 4)
-        rr = (t1 - price) / risk
-        if rr < MIN_RR:
-            continue
-
-        out.append({
-            "ticker": sym,
-            "timeframe": "1d-swing",
-            "strategy": "EMA trend + retest",
-            "prob": round(proba, 3),
-            "entry": round(price, 4),
-            "stop": round(stop, 4),
-            "targets": [t1, t2],
-            "trail": {"method": "ema20_atr", "atr_mult": CFG["trail_atr_mult"]},
-            "asof": base.index[-1].strftime("%Y-%m-%d"),
-        })
-
-    pd.Series(out, dtype="object").to_json(OUT / "signals_swing.json", orient="values", indent=2)
-    print(f"Wrote {len(out)} swing signals -> output/signals_swing.json")
+    rows.sort(key=lambda r: r["score"], reverse=True)
+    (OUT/"signals_swing.json").write_text(json.dumps(rows, indent=2), encoding="utf-8")
+    print(f"Wrote {len(rows)} swing signals -> {OUT/'signals_swing.json'}")
 
 if __name__ == "__main__":
     main()

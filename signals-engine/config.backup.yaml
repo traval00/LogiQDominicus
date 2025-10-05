@@ -1,0 +1,33 @@
+# ==== thresholds (looser so you get cards reliably) ====
+min_prob: 0.55               # generic floor used by heuristics
+min_score_intraday: 0.50      # 0..1 from our scoring
+min_score_swing: 0.55         # 0..1 from our scoring
+
+# ==== liquidity (equities only) ====
+min_avg_dollar_vol: 2000000   # last 20d average $ volume (price * volume)
+
+# ==== weekend/closed-market mode ====
+allow_weekend: true
+
+# ==== indicators ====
+ema_fast: 10
+ema_mid: 20
+ema_slow: 200
+rsi_len: 14
+atr_len: 14
+
+# ==== intraday fetch windows ====
+period_15m_equity: "60d"      # 15m bars; Yahoo usually needs 60d
+period_15m_crypto: "30d"      # 15m/30m bars for crypto
+
+# ==== swing (daily) fetch window ====
+period_1d: "1y"
+
+# ==== symbols ====
+symbols_equity:
+  - SPY - QQQ - NVDA - AAPL - MSFT - META - TSLA - AMD - AMZN - GOOGL
+  - NFLX - MU - SMCI - AVGO
+
+symbols_crypto:
+  - BTC-USD - ETH-USD - SOL-USD - XRP-USD - DOGE-USD
+  - ADA-USD - AVAX-USD - LINK-USD - LTC-USD - DOT-USD

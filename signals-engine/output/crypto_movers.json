@@ -1,106 +1,142 @@
 [
   {
-    "ticker":"ARB-USD",
-    "weekly_change":-0.0002761272
+    "symbol": "APT-USD",
+    "price": 5.52,
+    "change24h": 7.41,
+    "vol24h": 678764727.0,
+    "asof": "2025-10-05 16:29:38 UTC"
   },
   {
-    "ticker":"BTC-USD",
-    "weekly_change":-0.0543340986
+    "symbol": "NEAR-USD",
+    "price": 3.02,
+    "change24h": 4.63,
+    "vol24h": 324149505.0,
+    "asof": "2025-10-05 16:29:38 UTC"
   },
   {
-    "ticker":"XRP-USD",
-    "weekly_change":-0.0626759375
+    "symbol": "ARB-USD",
+    "price": 0.44,
+    "change24h": 3.89,
+    "vol24h": 196690941.0,
+    "asof": "2025-10-05 16:29:38 UTC"
   },
   {
-    "ticker":"ATOM-USD",
-    "weekly_change":-0.0825812317
+    "symbol": "FIL-USD",
+    "price": 2.37,
+    "change24h": 3.73,
+    "vol24h": 154727369.0,
+    "asof": "2025-10-05 16:29:38 UTC"
   },
   {
-    "ticker":"SHIB-USD",
-    "weekly_change":-0.094495801
+    "symbol": "ICP-USD",
+    "price": 4.61,
+    "change24h": 3.65,
+    "vol24h": 54790653.0,
+    "asof": "2025-10-05 16:29:38 UTC"
   },
   {
-    "ticker":"ETC-USD",
-    "weekly_change":-0.0977122922
+    "symbol": "DOGE-USD",
+    "price": 0.26,
+    "change24h": 3.54,
+    "vol24h": 2706548432.0,
+    "asof": "2025-10-05 16:29:38 UTC"
   },
   {
-    "ticker":"LINK-USD",
-    "weekly_change":-0.1061451021
+    "symbol": "RNDR-USD",
+    "price": 3.55,
+    "change24h": 3.44,
+    "vol24h": 64166369.0,
+    "asof": "2025-10-05 16:29:38 UTC"
   },
   {
-    "ticker":"ETH-USD",
-    "weekly_change":-0.1066149365
+    "symbol": "UNI-USD",
+    "price": 8.2,
+    "change24h": 3.42,
+    "vol24h": 258520750.0,
+    "asof": "2025-10-05 16:29:38 UTC"
   },
   {
-    "ticker":"RUNE-USD",
-    "weekly_change":-0.1117764419
+    "symbol": "SHIB-USD",
+    "price": 0.0,
+    "change24h": 3.27,
+    "vol24h": 308471893.0,
+    "asof": "2025-10-05 16:29:38 UTC"
   },
   {
-    "ticker":"HBAR-USD",
-    "weekly_change":-0.1211322281
+    "symbol": "LINK-USD",
+    "price": 22.52,
+    "change24h": 2.99,
+    "vol24h": 800327467.0,
+    "asof": "2025-10-05 16:29:38 UTC"
   },
   {
-    "ticker":"ADA-USD",
-    "weekly_change":-0.125466713
+    "symbol": "ATOM-USD",
+    "price": 4.22,
+    "change24h": 2.91,
+    "vol24h": 104200121.0,
+    "asof": "2025-10-05 16:29:38 UTC"
   },
   {
-    "ticker":"PYTH-USD",
-    "weekly_change":-0.1282400337
+    "symbol": "SOL-USD",
+    "price": 230.24,
+    "change24h": 2.46,
+    "vol24h": 6551045330.0,
+    "asof": "2025-10-05 16:29:38 UTC"
   },
   {
-    "ticker":"SEI-USD",
-    "weekly_change":-0.129460315
+    "symbol": "DOT-USD",
+    "price": 4.24,
+    "change24h": 2.3,
+    "vol24h": 227113845.0,
+    "asof": "2025-10-05 16:29:38 UTC"
   },
   {
-    "ticker":"AVAX-USD",
-    "weekly_change":-0.1330357027
+    "symbol": "SUI-USD",
+    "price": 3.6,
+    "change24h": 2.15,
+    "vol24h": 1246429458.0,
+    "asof": "2025-10-05 16:29:38 UTC"
   },
   {
-    "ticker":"NEAR-USD",
-    "weekly_change":-0.1386004984
+    "symbol": "HBAR-USD",
+    "price": 0.22,
+    "change24h": 2.05,
+    "vol24h": 208254132.0,
+    "asof": "2025-10-05 16:29:38 UTC"
   },
   {
-    "ticker":"DOGE-USD",
-    "weekly_change":-0.1416101394
+    "symbol": "XRP-USD",
+    "price": 3.01,
+    "change24h": 1.97,
+    "vol24h": 4568698517.0,
+    "asof": "2025-10-05 16:29:38 UTC"
   },
   {
-    "ticker":"INJ-USD",
-    "weekly_change":-0.1456537532
+    "symbol": "ADA-USD",
+    "price": 0.85,
+    "change24h": 1.97,
+    "vol24h": 1137949131.0,
+    "asof": "2025-10-05 16:29:38 UTC"
   },
   {
-    "ticker":"SOL-USD",
-    "weekly_change":-0.1556527467
+    "symbol": "ETH-USD",
+    "price": 4536.13,
+    "change24h": 1.74,
+    "vol24h": 37457563128.0,
+    "asof": "2025-10-05 16:29:38 UTC"
   },
   {
-    "ticker":"AR-USD",
-    "weekly_change":-0.1559377551
+    "symbol": "BNB-USD",
+    "price": 1160.03,
+    "change24h": 1.58,
+    "vol24h": 2474502813.0,
+    "asof": "2025-10-05 16:29:38 UTC"
   },
   {
-    "ticker":"FLOKI-USD",
-    "weekly_change":-0.1579617207
-  },
-  {
-    "ticker":"BONK-USD",
-    "weekly_change":-0.1655136383
-  },
-  {
-    "ticker":"OP-USD",
-    "weekly_change":-0.1708930463
-  },
-  {
-    "ticker":"JUP-USD",
-    "weekly_change":-0.1763166214
-  },
-  {
-    "ticker":"WIF-USD",
-    "weekly_change":-0.1800760476
-  },
-  {
-    "ticker":"TIA-USD",
-    "weekly_change":-0.18233581
-  },
-  {
-    "ticker":"STRK-USD",
-    "weekly_change":-0.4181079649
+    "symbol": "LTC-USD",
+    "price": 120.01,
+    "change24h": 1.46,
+    "vol24h": 764404865.0,
+    "asof": "2025-10-05 16:29:38 UTC"
   }
 ]

@@ -1,110 +1,197 @@
 # generate_signals.py
-import numpy as np, pandas as pd, yfinance as yf, yaml, joblib, datetime as dt
+import os, json, math, datetime as dt, logging
 from pathlib import Path
-from ta.momentum import RSIIndicator
-from ta.volatility import AverageTrueRange
-from ai.featurize import make_features, FEATS
-from options_picker import pick_option_contract
-from news import sentiment_for
+
+import numpy as np
+import pandas as pd
+import yfinance as yf
+
+# ---------------- Setup logging ----------------
+logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
 
 ROOT = Path(__file__).resolve().parent
-CFG = yaml.safe_load((ROOT / "config.yaml").read_text())
-MODELS = ROOT / "models"; OUT = ROOT / "output"; OUT.mkdir(exist_ok=True)
+OUT = ROOT / "output"
+OUT.mkdir(exist_ok=True)
 
-FAST, MID, SLOW = CFG["ema_fast"], CFG["ema_mid"], CFG["ema_slow"]
-MIN_P, MAX_P, MIN_PROB = CFG["min_price"], CFG["max_price"], CFG["min_prob"]
-SYMS_E, SYMS_C = CFG["symbols_equity"], CFG["symbols_crypto"]
+# -------------- Symbols (fallback if no config.yaml) --------------
+DEFAULT_EQUITY = [
+    "SPY","QQQ","NVDA","AAPL","MSFT","META","TSLA","AMD","AMZN","GOOGL",
+    "NFLX","MU","SMCI","AVGO"
+]
+DEFAULT_CRYPTO = [
+    "BTC-USD","ETH-USD","SOL-USD","XRP-USD","DOGE-USD","ADA-USD",
+    "AVAX-USD","LINK-USD","LTC-USD","DOT-USD"
+]
 
-# weekend loosening
-today = dt.datetime.utcnow().weekday()  # 0=Mon ... 5=Sat, 6=Sun
-WEEKEND = CFG.get("weekend_mode", False) and (today in (5, 6))
-W_MIN_PROB = CFG.get("weekend_min_prob", MIN_PROB)
-CRYPTO_ONLY = CFG.get("weekend_crypto_only", False)
-
-def fetch15(ticker, period="60d"):
-    df = yf.download(ticker, period=period, interval="15m", auto_adjust=True, progress=False)
-    if df.empty: return df
+# -------------- helpers --------------
+def _flatten(df: pd.DataFrame) -> pd.DataFrame:
+    """Make sure columns are ['open','high','low','close','volume'] and numeric."""
+    if df is None or df.empty:
+        return pd.DataFrame()
+    # Handle MultiIndex (Price, Ticker) from yfinance
     if isinstance(df.columns, pd.MultiIndex):
-        df.columns = ['_'.join([str(x) for x in tup if str(x)!='']) for tup in df.columns]
-    df.columns = [str(c).strip() for c in df.columns]
-    return df
+        # Take first level name-insensitive
+        cols = {}
+        for (price, *_), ser in df.items():
+            k = str(price).lower()
+            if k == "open": cols.setdefault("open", ser)
+            if k == "high": cols.setdefault("high", ser)
+            if k == "low": cols.setdefault("low", ser)
+            if k == "close": cols.setdefault("close", ser)
+            if k == "volume": cols.setdefault("volume", ser)
+        if not cols:
+            return pd.DataFrame()
+        out = pd.DataFrame(cols)
+    else:
+        # Single-level; normalize common Yahoo names
+        rename_map = {
+            "Open":"open","High":"high","Low":"low","Close":"close","Adj Close":"close","Volume":"volume"
+        }
+        out = df.rename(columns={c: rename_map.get(c, c).lower() for c in df.columns})
+        # some builds use lowercase already
+        for want in ["open","high","low","close","volume"]:
+            if want not in out.columns and want.capitalize() in out.columns:
+                out[want] = out[want.capitalize()]
 
-def _get_series(df, candidates):
-    cols = [str(c).lower() for c in df.columns]
-    for name in candidates:
-        k = name.lower()
-        if k in cols: s = df.iloc[:, cols.index(k)]; return s.squeeze()
-        for i, c in enumerate(cols):
-            if c == f"{k}_spy" or c.endswith(f"_{k}") or c.startswith(f"{k}_") or k in c:
-                s = df.iloc[:, i]; return s.squeeze()
-    raise KeyError(f"Missing {candidates}")
+    # keep only what we need
+    out = out[ [c for c in ["open","high","low","close","volume"] if c in out.columns] ].copy()
+    if "close" not in out.columns:
+        return pd.DataFrame()
 
-def enrich(raw):
-    if raw.empty: return raw
-    c = pd.to_numeric(_get_series(raw, ["close","adj close","adj_close","adjclose"]), errors="coerce")
-    h = pd.to_numeric(_get_series(raw, ["high"]), errors="coerce")
-    l = pd.to_numeric(_get_series(raw, ["low"]),  errors="coerce")
-    df = pd.DataFrame(index=raw.index)
-    df["close"], df["high"], df["low"] = c, h, l
-    df["ema10"]  = df["close"].ewm(span=FAST, adjust=False).mean()
-    df["ema20"]  = df["close"].ewm(span=MID,  adjust=False).mean()
-    df["ema200"] = df["close"].ewm(span=SLOW, adjust=False).mean()
-    df["rsi"] = RSIIndicator(df["close"], window=CFG["rsi_len"]).rsi()
-    df["atr"] = AverageTrueRange(df["high"], df["low"], df["close"], window=CFG["atr_len"]).average_true_range()
-    return df.replace([np.inf,-np.inf], np.nan).dropna()
+    # numeric
+    for c in out.columns:
+        out[c] = pd.to_numeric(out[c], errors="coerce")
+    out = out.dropna(subset=["close"])
+    return out
 
-def load_model():
-    p = MODELS / "model.pkl"
-    return joblib.load(p) if p.exists() else None
+def fetch_1d(sym, period="60d"):
+    try:
+        raw = yf.download(sym, period=period, interval="1d", auto_adjust=True, progress=False)
+        return _flatten(raw)
+    except Exception as e:
+        logging.error(f"{sym}: 1d download failed: {e}")
+        return pd.DataFrame()
 
-def make_row(ticker, base, proba, sent):
-    last = base.iloc[-1]; price = float(last["close"])
-    if not (MIN_P <= price <= MAX_P): return None
-    stop = float(min(last["ema20"], base["low"].tail(4).min())); risk = price - stop
-    if risk <= 0: return None
-    targets = [round(price + r*risk, 4) for r in CFG["risk_r_targets"]]
-    opt = None
-    if "-USD" not in ticker:  # equities only
-        opt = pick_option_contract(ticker, "BUY", CFG["opt_moneyness_pct"], CFG["opt_days_min"], CFG["opt_days_max"])
-    return {
-        "ticker": ticker, "timeframe": "15m-intraday", "strategy": "ORB+EMA break&retest",
-        "prob": round(float(proba),3), "news_sent": round(float(sent),3),
-        "entry": round(price,4), "stop": round(stop,4), "targets": targets,
-        "trail": {"method":"ema20_atr","atr_mult": CFG["trail_atr_mult"]},
-        "options_suggestion": opt, "asof": base.index[-1].strftime("%Y-%m-%d %H:%M")
-    }
+def fetch_15m(sym, period="5d"):
+    try:
+        raw = yf.download(sym, period=period, interval="15m", auto_adjust=True, progress=False)
+        return _flatten(raw)
+    except Exception as e:
+        logging.warning(f"{sym}: 15m download failed: {e}")
+        return pd.DataFrame()
+
+def ema(s: pd.Series, span: int) -> pd.Series:
+    return s.ewm(span=span, adjust=False).mean()
+
+def orb_score(df15: pd.DataFrame) -> float:
+    """Simple ORB tendency score from first 30m vs current."""
+    if df15 is None or df15.empty or len(df15) < 4:
+        return 0.0
+    first30_high = df15["high"].iloc[:2].max()
+    first30_low = df15["low"].iloc[:2].min()
+    last = df15["close"].iloc[-1]
+    if last > first30_high:
+        return 0.7
+    if last < first30_low:
+        return -0.7
+    return 0.0
+
+def ema_confluence(df: pd.DataFrame) -> float:
+    """EMA10/20/200 alignment signal."""
+    if df is None or df.empty or len(df) < 50:
+        return 0.0
+    e10 = ema(df["close"], 10).iloc[-1]
+    e20 = ema(df["close"], 20).iloc[-1]
+    e200 = ema(df["close"], 200).iloc[-1] if len(df) >= 210 else ema(df["close"], 200).iloc[-1]
+    last = df["close"].iloc[-1]
+    bull = float(last>e10>e20>e200)
+    bear = float(last<e10<e20<e200)
+    return 0.6 if bull else (-0.6 if bear else 0.0)
+
+def blend_score(sym: str, d1: pd.DataFrame, m15: pd.DataFrame) -> float:
+    """Blend daily momentum + intraday ORB + EMA structure."""
+    if d1 is None or d1.empty:
+        return 0.0
+    try:
+        mom = (d1["close"].iloc[-1] / d1["close"].iloc[-5] - 1.0) if len(d1) >= 6 else 0.0
+    except Exception:
+        mom = 0.0
+    intraday = orb_score(m15) if m15 is not None and not m15.empty else 0.0
+    ema_s = ema_confluence(d1)
+    score = 0.5*mom + 0.3*intraday + 0.2*ema_s
+    return float(score)
+
+def make_entry_stop_targets(df: pd.DataFrame, direction: str):
+    last = df.iloc[-1]
+    price = float(last["close"])
+    e20 = float(ema(df["close"], 20).iloc[-1])
+    if direction == "LONG":
+        stop = min(e20, float(df["low"].tail(5).min()))
+        risk = price - stop
+        targets = [round(price + r*risk, 4) for r in (1.0, 1.5, 2.0)]
+    else:
+        stop = max(e20, float(df["high"].tail(5).max()))
+        risk = stop - price
+        targets = [round(price - r*risk, 4) for r in (1.0, 1.5, 2.0)]
+    return round(price,4), round(stop,4), targets
+
+def load_symbol_lists():
+    # Minimal, robust: try config.yaml; otherwise defaults
+    cfg_path = ROOT / "config.yaml"
+    if cfg_path.exists():
+        try:
+            import yaml
+            cfg = yaml.safe_load(cfg_path.read_text())
+            equities = cfg.get("symbols_equity", DEFAULT_EQUITY)
+            cryptos  = cfg.get("symbols_crypto", DEFAULT_CRYPTO)
+            return equities, cryptos
+        except Exception as e:
+            logging.warning(f"config.yaml read failed, using defaults: {e}")
+    return DEFAULT_EQUITY, DEFAULT_CRYPTO
 
 def main():
-    out = []; model_pack = load_model()
-    syms = []
-    if WEEKEND and CRYPTO_ONLY:
-        syms = SYMS_C[:]  # only crypto
-    else:
-        syms = SYMS_E + SYMS_C
+    equities, cryptos = load_symbol_lists()
+    symbols = equities + cryptos
 
-    for sym in syms:
-        raw = fetch15(sym, CFG["period_15m"]); base = enrich(raw)
-        if base.empty or len(base) < 120:  # 120 bars ≈ 5 trading days
+    rows = []
+    for sym in symbols:
+        d1 = fetch_1d(sym, "120d")
+        m15 = fetch_15m(sym, "5d")
+        if d1.empty and m15.empty:
+            logging.warning(f"{sym}: no data; skipping")
             continue
 
-        feats = make_features(base)
-        # choose threshold (looser on weekend)
-        min_prob = W_MIN_PROB if (WEEKEND and "-USD" in sym) else MIN_PROB
+        score = blend_score(sym, d1, m15)
+        direction = "LONG" if score >= 0 else "SHORT"
+        use_df = d1 if not d1.empty else m15
+        entry, stop, targets = make_entry_stop_targets(use_df, direction)
 
-        # proba
-        if model_pack:
-            proba = float(model_pack["model"].predict_proba(feats[FEATS].iloc[[-1]])[0,1])
-        else:
-            last = feats.iloc[-1]
-            proba = 0.58 if (last["close"]>last["ema20"]>last["ema200"] and 40<=last["rsi"]<=75) else 0.45
+        rows.append({
+            "symbol": sym,
+            "timeframe": "15m+1d blend",
+            "direction": direction,
+            "score": round(score, 3),
+            "entry": entry,
+            "stop": stop,
+            "targets": targets,
+            "note": "ORB/EMA blended with daily momentum",
+            "asof": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        })
 
-        sent = sentiment_for(sym)
-        if proba >= min_prob:
-            row = make_row(sym, base, proba, sent)
-            if row: out.append(row)
+    # sort best to worst
+    rows.sort(key=lambda r: abs(r["score"]), reverse=True)
 
-    pd.Series(out, dtype="object").to_json(OUT / "signals.json", orient="values", indent=2)
-    print(f"Wrote {len(out)} signals -> output/signals.json")
+    # Fallback: if everything very low, keep top 10 anyway so UI has content
+    if not rows:
+        logging.warning("No intraday candidates. Writing empty list.")
+    else:
+        # Trim to top 25 for the UI
+        rows = rows[:25]
+
+    out_path = OUT / "signals.json"
+    with out_path.open("w", encoding="utf-8") as f:
+        json.dump(rows, f, indent=2)
+    logging.info(f"Wrote {len(rows)} signals -> {out_path}")
 
 if __name__ == "__main__":
     main()

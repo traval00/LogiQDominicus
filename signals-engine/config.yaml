@@ -1,69 +1,45 @@
 symbols_equity:
-- SPY
-- QQQ
-- NVDA
-- AAPL
-- MSFT
-- META
-- TSLA
-- AMD
-- AMZN
-- GOOGL
-- NFLX
-- SMCI
-- AVGO
-- MU
+  - SPY
+  - QQQ
+  - NVDA
+  - AAPL
+  - MSFT
+  - META
+  - TSLA
+  - AMD
+  - AMZN
+  - GOOGL
+  - NFLX
+  - MU
+  - SMCI
+  - AVGO
+
 symbols_crypto:
-- ADA-USD
-- APT-USD
-- ARB-USD
-- ATOM-USD
-- AVAX-USD
-- BONK-USD
-- BTC-USD
-- DOGE-USD
-- ETC-USD
-- ETH-USD
-- FTM-USD
-- HBAR-USD
-- INJ-USD
-- LINK-USD
-- MATIC-USD
-- NEAR-USD
-- OP-USD
-- PEPE-USD
-- PYTH-USD
-- RUNE-USD
-- SEI-USD
-- SHIB-USD
-- SOL-USD
-- SUI-USD
-- XRP-USD
-period_15m: 60d
-lookback_days: 21
+  - BTC-USD
+  - ETH-USD
+  - SOL-USD
+  - XRP-USD
+  - DOGE-USD
+  - ADA-USD
+  - AVAX-USD
+  - LINK-USD
+  - LTC-USD
+  - DOT-USD
+
+# model / indicators
 ema_fast: 10
 ema_mid: 20
 ema_slow: 200
 rsi_len: 14
-atr_len: 14
-risk_r_targets:
-- 1.0
-- 2.0
-trail_method: ema20_atr
-trail_atr_mult: 1.0
-min_price: 0.01
-max_price: 200000
-min_prob: 0.52
-swing_horizon_days: 10
-swing_min_prob: 0.58
-swing_min_rr: 1.2
-swing_trend_confirm: true
-swing_retest_required: false
-swing_min_avg_vol: 200000
-weekend_mode: true
-weekend_min_prob: 0.5
-weekend_crypto_only: true
-opt_days_min: 7
-opt_days_max: 14
-opt_moneyness_pct: 5
-news_api: env:NEWS_API_KEY
+
+# periods
+period_1d: 180d
+
+# thresholds (loosen for demo)
+min_score_intraday: 0.45
+min_score_swing: 0.50
+min_avg_dollar_vol: 1000000
+
+# guaranteed rows for demo/sales
+fallback_top_n_intraday: 8
+fallback_top_n_swing: 8
