@@ -12,7 +12,7 @@
       243.7502
     ],
     "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:30:00 UTC"
+    "asof": "2025-10-05 18:11:07 UTC"
   },
   {
     "symbol": "SMCI",
@@ -27,67 +27,67 @@
       64.0
     ],
     "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:30:01 UTC"
-  },
-  {
-    "symbol": "ETH-USD",
-    "timeframe": "15m+1d blend",
-    "direction": "LONG",
-    "score": 0.351,
-    "entry": 4534.6973,
-    "stop": 4125.542,
-    "targets": [
-      4943.8525,
-      5148.4302,
-      5353.0078
-    ],
-    "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:30:03 UTC"
-  },
-  {
-    "symbol": "LTC-USD",
-    "timeframe": "15m+1d blend",
-    "direction": "LONG",
-    "score": 0.351,
-    "entry": 120.068,
-    "stop": 105.5269,
-    "targets": [
-      134.6092,
-      141.8798,
-      149.1503
-    ],
-    "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:30:06 UTC"
-  },
-  {
-    "symbol": "SOL-USD",
-    "timeframe": "15m+1d blend",
-    "direction": "LONG",
-    "score": 0.35,
-    "entry": 230.3399,
-    "stop": 206.6207,
-    "targets": [
-      254.0591,
-      265.9186,
-      277.7782
-    ],
-    "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:30:03 UTC"
+    "asof": "2025-10-05 18:11:08 UTC"
   },
   {
     "symbol": "BTC-USD",
     "timeframe": "15m+1d blend",
     "direction": "LONG",
-    "score": 0.348,
-    "entry": 123027.3594,
+    "score": 0.349,
+    "entry": 123063.3594,
     "stop": 113981.3984,
     "targets": [
-      132073.3203,
-      136596.3008,
-      141119.2812
+      132145.3203,
+      136686.3008,
+      141227.2812
     ],
     "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:30:02 UTC"
+    "asof": "2025-10-05 18:11:09 UTC"
+  },
+  {
+    "symbol": "ETH-USD",
+    "timeframe": "15m+1d blend",
+    "direction": "LONG",
+    "score": 0.349,
+    "entry": 4512.7026,
+    "stop": 4125.542,
+    "targets": [
+      4899.8633,
+      5093.4436,
+      5287.0239
+    ],
+    "note": "ORB/EMA blended with daily momentum",
+    "asof": "2025-10-05 18:11:09 UTC"
+  },
+  {
+    "symbol": "SOL-USD",
+    "timeframe": "15m+1d blend",
+    "direction": "LONG",
+    "score": 0.348,
+    "entry": 229.4641,
+    "stop": 206.6207,
+    "targets": [
+      252.3076,
+      263.7293,
+      275.151
+    ],
+    "note": "ORB/EMA blended with daily momentum",
+    "asof": "2025-10-05 18:11:10 UTC"
+  },
+  {
+    "symbol": "LTC-USD",
+    "timeframe": "15m+1d blend",
+    "direction": "LONG",
+    "score": 0.348,
+    "entry": 119.3024,
+    "stop": 105.5269,
+    "targets": [
+      133.0778,
+      139.9656,
+      146.8533
+    ],
+    "note": "ORB/EMA blended with daily momentum",
+    "asof": "2025-10-05 18:11:13 UTC"
   },
   {
     "symbol": "NVDA",
@@ -102,37 +102,22 @@
       202.22
     ],
     "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:29:56 UTC"
+    "asof": "2025-10-05 18:11:03 UTC"
   },
   {
     "symbol": "DOGE-USD",
     "timeframe": "15m+1d blend",
     "direction": "LONG",
-    "score": 0.346,
-    "entry": 0.2565,
+    "score": 0.343,
+    "entry": 0.2548,
     "stop": 0.2308,
     "targets": [
-      0.2821,
-      0.2949,
-      0.3077
+      0.2788,
+      0.2908,
+      0.3028
     ],
     "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:30:04 UTC"
-  },
-  {
-    "symbol": "DOT-USD",
-    "timeframe": "15m+1d blend",
-    "direction": "LONG",
-    "score": 0.345,
-    "entry": 4.245,
-    "stop": 3.8892,
-    "targets": [
-      4.6008,
-      4.7787,
-      4.9566
-    ],
-    "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:30:07 UTC"
+    "asof": "2025-10-05 18:11:11 UTC"
   },
   {
     "symbol": "AMD",
@@ -147,22 +132,7 @@
       175.35
     ],
     "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:29:58 UTC"
-  },
-  {
-    "symbol": "XRP-USD",
-    "timeframe": "15m+1d blend",
-    "direction": "LONG",
-    "score": 0.34,
-    "entry": 3.0076,
-    "stop": 2.8169,
-    "targets": [
-      3.1984,
-      3.2937,
-      3.3891
-    ],
-    "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:30:04 UTC"
+    "asof": "2025-10-05 18:11:05 UTC"
   },
   {
     "symbol": "AAPL",
@@ -177,7 +147,37 @@
       278.3827
     ],
     "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:29:56 UTC"
+    "asof": "2025-10-05 18:11:03 UTC"
+  },
+  {
+    "symbol": "XRP-USD",
+    "timeframe": "15m+1d blend",
+    "direction": "LONG",
+    "score": 0.337,
+    "entry": 2.9885,
+    "stop": 2.8169,
+    "targets": [
+      3.1601,
+      3.2459,
+      3.3317
+    ],
+    "note": "ORB/EMA blended with daily momentum",
+    "asof": "2025-10-05 18:11:10 UTC"
+  },
+  {
+    "symbol": "DOT-USD",
+    "timeframe": "15m+1d blend",
+    "direction": "LONG",
+    "score": 0.337,
+    "entry": 4.1823,
+    "stop": 3.8892,
+    "targets": [
+      4.4753,
+      4.6219,
+      4.7684
+    ],
+    "note": "ORB/EMA blended with daily momentum",
+    "asof": "2025-10-05 18:11:14 UTC"
   },
   {
     "symbol": "SPY",
@@ -192,7 +192,7 @@
       687.4647
     ],
     "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:29:54 UTC"
+    "asof": "2025-10-05 18:11:01 UTC"
   },
   {
     "symbol": "QQQ",
@@ -207,7 +207,7 @@
       622.1987
     ],
     "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:29:55 UTC"
+    "asof": "2025-10-05 18:11:02 UTC"
   },
   {
     "symbol": "MSFT",
@@ -222,7 +222,7 @@
       534.2899
     ],
     "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:29:57 UTC"
+    "asof": "2025-10-05 18:11:04 UTC"
   },
   {
     "symbol": "META",
@@ -237,7 +237,7 @@
       630.1199
     ],
     "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:29:57 UTC"
+    "asof": "2025-10-05 18:11:04 UTC"
   },
   {
     "symbol": "NFLX",
@@ -252,7 +252,7 @@
       1010.9799
     ],
     "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:30:00 UTC"
+    "asof": "2025-10-05 18:11:07 UTC"
   },
   {
     "symbol": "TSLA",
@@ -267,37 +267,22 @@
       347.99
     ],
     "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:29:58 UTC"
+    "asof": "2025-10-05 18:11:05 UTC"
   },
   {
-    "symbol": "ADA-USD",
+    "symbol": "AVAX-USD",
     "timeframe": "15m+1d blend",
-    "direction": "LONG",
-    "score": 0.212,
-    "entry": 0.8538,
-    "stop": 0.7982,
+    "direction": "SHORT",
+    "score": -0.222,
+    "entry": 29.9414,
+    "stop": 31.5295,
     "targets": [
-      0.9095,
-      0.9373,
-      0.9651
+      28.3534,
+      27.5593,
+      26.7653
     ],
     "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:30:05 UTC"
-  },
-  {
-    "symbol": "LINK-USD",
-    "timeframe": "15m+1d blend",
-    "direction": "LONG",
-    "score": 0.209,
-    "entry": 22.5398,
-    "stop": 21.0821,
-    "targets": [
-      23.9975,
-      24.7263,
-      25.4552
-    ],
-    "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:30:06 UTC"
+    "asof": "2025-10-05 18:11:12 UTC"
   },
   {
     "symbol": "GOOGL",
@@ -312,22 +297,37 @@
       233.75
     ],
     "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:29:59 UTC"
+    "asof": "2025-10-05 18:11:06 UTC"
   },
   {
-    "symbol": "AVAX-USD",
+    "symbol": "ADA-USD",
+    "timeframe": "15m+1d blend",
+    "direction": "LONG",
+    "score": 0.207,
+    "entry": 0.8443,
+    "stop": 0.7982,
+    "targets": [
+      0.8905,
+      0.9135,
+      0.9366
+    ],
+    "note": "ORB/EMA blended with daily momentum",
+    "asof": "2025-10-05 18:11:12 UTC"
+  },
+  {
+    "symbol": "LINK-USD",
     "timeframe": "15m+1d blend",
     "direction": "LONG",
     "score": 0.203,
-    "entry": 30.2639,
-    "stop": 29.6212,
+    "entry": 22.2693,
+    "stop": 21.0821,
     "targets": [
-      30.9066,
-      31.228,
-      31.5493
+      23.4565,
+      24.0501,
+      24.6437
     ],
     "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:30:05 UTC"
+    "asof": "2025-10-05 18:11:13 UTC"
   },
   {
     "symbol": "AVGO",
@@ -342,7 +342,7 @@
       366.11
     ],
     "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:30:02 UTC"
+    "asof": "2025-10-05 18:11:08 UTC"
   },
   {
     "symbol": "AMZN",
@@ -357,6 +357,6 @@
       209.7213
     ],
     "note": "ORB/EMA blended with daily momentum",
-    "asof": "2025-10-05 16:29:59 UTC"
+    "asof": "2025-10-05 18:11:06 UTC"
   }
 ]

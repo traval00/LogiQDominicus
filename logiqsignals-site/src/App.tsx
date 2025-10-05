@@ -1,704 +1,448 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-/** ===========================
- *  Tiny utilities (sound + confetti)
- *  =========================== */
-function pingSound() {
-  try {
-    const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
-    const ctx = new Ctx();
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = "sine";
-    o.frequency.value = 880;
-    g.gain.value = 0.0001;
-    o.connect(g);
-    g.connect(ctx.destination);
-    const now = ctx.currentTime;
-    o.start();
-    g.gain.exponentialRampToValueAtTime(0.05, now + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.00001, now + 0.18);
-    o.stop(now + 0.2);
-  } catch {}
+/** ---------- Types (loose to avoid TS build drama) ---------- */
+type AnyRow = Record<string, any>;
+type Feed<T = AnyRow> = { data: T[]; asof?: string };
+
+/** ---------- Small utils ---------- */
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const fmt = (n?: number | string, p = 2) =>
+  n === undefined || n === null || n === "" ? "—" : Number(n).toFixed(p);
+const pct = (n?: number) =>
+  n === undefined || n === null ? "—" : `${(n * 100).toFixed(1)}%`;
+const kmb = (n?: number) => {
+  if (typeof n !== "number" || isNaN(n)) return "—";
+  if (n >= 1e9) return (n / 1e9).toFixed(1) + "B";
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
+  return n.toFixed(0);
+};
+
+async function fetchJSON<T = any>(url: string): Promise<T> {
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+  return res.json();
 }
 
-function confettiBurst(anchor?: HTMLElement | null) {
+/** ---------- Confetti (tiny, dependency-free) ---------- */
+function fireConfetti(container: HTMLElement) {
   const c = document.createElement("canvas");
-  c.className = "confetti";
+  c.width = container.clientWidth;
+  c.height = 180;
+  c.style.position = "absolute";
+  c.style.left = "0";
+  c.style.right = "0";
+  c.style.top = "0";
+  c.style.pointerEvents = "none";
+  container.appendChild(c);
   const ctx = c.getContext("2d")!;
-  document.body.appendChild(c);
-
-  function resize() {
-    c.width = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
-    c.height = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
-  }
-  resize();
-  window.addEventListener("resize", resize, { once: true });
-
-  const colors = ["#7c3aed", "#06b6d4", "#22c55e", "#f59e0b", "#e879f9"];
-  const N = 160;
-  const rect = anchor?.getBoundingClientRect();
-  const originX = rect ? rect.left + rect.width / 2 : c.width / 2;
-  const originY = rect ? rect.top + rect.height / 2 : c.height * 0.18;
-
-  const parts = Array.from({ length: N }).map(() => ({
-    x: originX,
-    y: originY,
-    r: 2 + Math.random() * 3,
-    a: Math.random() * Math.PI * 2,
-    v: 4 + Math.random() * 6,
-    col: colors[(Math.random() * colors.length) | 0],
-    spin: (Math.random() - 0.5) * 0.2,
+  const pieces = Array.from({ length: 80 }, () => ({
+    x: Math.random() * c.width,
+    y: Math.random() * -40,
+    r: 2 + Math.random() * 4,
+    vx: -1 + Math.random() * 2,
+    vy: 1 + Math.random() * 2,
+    col: `hsl(${Math.floor(Math.random() * 360)}, 80%, 60%)`,
   }));
-
-  const start = performance.now();
-  const duration = 700;
-
-  function frame(t: number) {
-    const k = Math.min(1, (t - start) / duration);
+  let t = 0;
+  const tick = () => {
+    t++;
     ctx.clearRect(0, 0, c.width, c.height);
-    parts.forEach((p) => {
-      p.x += Math.cos(p.a) * p.v;
-      p.y += Math.sin(p.a) * p.v + k * 3; // gravity
-      p.a += p.spin;
+    pieces.forEach((p) => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.03; // gravity
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
       ctx.fillStyle = p.col;
       ctx.fill();
     });
-    if (k < 1) requestAnimationFrame(frame);
-    else c.remove();
-  }
-  requestAnimationFrame(frame);
+    if (t < 220) requestAnimationFrame(tick);
+    else container.removeChild(c);
+  };
+  tick();
 }
 
-/** ===========================
- *  Data + fetch helpers
- *  =========================== */
-type IntradayRow = {
-  symbol: string;
-  note?: string;
-  score?: number;
-  timeframe?: string;
-  asof?: string;
-};
+/** ---------- Tabs ---------- */
+type TabKey = "intraday" | "swing" | "crypto" | "options";
+const TABS: { key: TabKey; label: string }[] = [
+  { key: "intraday", label: "Intraday" },
+  { key: "swing", label: "Swing" },
+  { key: "crypto", label: "Crypto" },
+  { key: "options", label: "Options" },
+];
 
-type SwingRow = {
-  ticker: string;
-  prob?: number;
-  entry?: number;
-  stop?: number;
-  targets?: number[];
-  asof?: string;
-};
-
-type CryptoMover = {
-  symbol: string;
-  pct_24h?: number;
-  pct_7d?: number;
-};
-
-type OptionPick = {
-  symbol: string;
-  type: "CALL" | "PUT";
-  strike: number;
-  expiry: string;
-  delta?: number;
-  bid?: number;
-  ask?: number;
-  spread?: number;
-  premium?: number;
-};
-
-async function fetchJSON<T>(url: string): Promise<T | null> {
-  try {
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return (await res.json()) as T;
-  } catch (e) {
-    console.warn("fetchJSON fail:", url, e);
-    return null;
-  }
-}
-
-/** Minimal CSV maker */
-function toCSV(headers: string[], rows: any[], pick: (r: any) => (string | number | undefined)[]): string {
-  const head = headers.join(",");
-  const body = rows
-    .map((r) =>
-      pick(r)
-        .map((x) => {
-          const s = x ?? "";
-          const str = String(s);
-          return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
-        })
-        .join(",")
-    )
-    .join("\n");
-  return head + "\n" + body;
-}
-
-/** ===========================
- *  Main App
- *  =========================== */
+/** ---------- App ---------- */
 export default function App() {
-  const [tab, setTab] = useState<"intraday" | "swing" | "crypto" | "options">("intraday");
+  const [tab, setTab] = useState<TabKey>("intraday");
+
+  const [intraday, setIntraday] = useState<Feed>({ data: [] });
+  const [swing, setSwing] = useState<Feed>({ data: [] });
+  const [crypto, setCrypto] = useState<Feed>({ data: [] });
+  const [options, setOptions] = useState<Feed>({ data: [] });
+
   const [loading, setLoading] = useState(false);
-  const [intraday, setIntraday] = useState<IntradayRow[]>([]);
-  const [swing, setSwing] = useState<SwingRow[]>([]);
-  const [crypto, setCrypto] = useState<CryptoMover[]>([]);
-  const [options, setOptions] = useState<OptionPick[]>([]);
-  const buyRef = useRef<HTMLButtonElement | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
-  async function loadAll() {
+  async function loadFeeds() {
     setLoading(true);
-    const [i, s, c, o] = await Promise.all([
-      fetchJSON<IntradayRow[]>("/signals.json"),
-      fetchJSON<SwingRow[]>("/signals_swing.json"),
-      fetchJSON<CryptoMover[]>("/crypto_movers.json"),
-      fetchJSON<OptionPick[]>("/options.json"),
-    ]);
+    setErr(null);
+    try {
+      const [a, b, c, d] = await Promise.all([
+        fetchJSON("/signals.json").catch(() => ({ data: [] })),
+        fetchJSON("/signals_swing.json").catch(() => ({ data: [] })),
+        fetchJSON("/crypto_movers.json").catch(() => ({ data: [] })),
+        fetchJSON("/options.json").catch(() => ({ data: [] })),
+      ]);
 
-    setIntraday(Array.isArray(i) ? i : []);
-    setSwing(Array.isArray(s) ? s : []);
-    setCrypto(Array.isArray(c) ? c : []);
-    setOptions(Array.isArray(o) ? o : []);
-    setLoading(false);
+      // normalize: if plain array, wrap as {data: [...]}
+      setIntraday(Array.isArray(a) ? { data: a } : a);
+      setSwing(Array.isArray(b) ? { data: b } : b);
+      setCrypto(Array.isArray(c) ? { data: c } : c);
+      setOptions(Array.isArray(d) ? { data: d } : d);
+    } catch (e: any) {
+      setErr(e?.message || "Failed to load feeds");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
-    loadAll();
-    // slide-in the buy button after mount
-    setTimeout(() => buyRef.current?.classList.add("in"), 350);
+    loadFeeds();
   }, []);
 
-  const anyData = intraday.length + swing.length + crypto.length + options.length > 0;
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  /** CSV actions */
-  function download(name: string, text: string) {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
-    a.download = name;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  }
+  const totals = useMemo(() => {
+    const safeLen = (v: Feed) => (Array.isArray(v?.data) ? v.data.length : 0);
+    return {
+      intraday: safeLen(intraday),
+      swing: safeLen(swing),
+      crypto: safeLen(crypto),
+      options: safeLen(options),
+    };
+  }, [intraday, swing, crypto, options]);
 
-  function exportIntradayCSV() {
-    const csv = toCSV(
-      ["symbol", "score", "note", "timeframe", "asof"],
-      intraday,
-      (r) => [r.symbol, r.score ?? "", r.note ?? "", r.timeframe ?? "", r.asof ?? ""]
-    );
-    download("intraday.csv", csv);
-  }
-
-  function exportSwingCSV() {
-    const csv = toCSV(
-      ["ticker", "prob", "entry", "stop", "targets", "asof"],
-      swing,
-      (r) => [r.ticker, r.prob ?? "", r.entry ?? "", r.stop ?? "", (r.targets || []).join("|"), r.asof ?? ""]
-    );
-    download("swing.csv", csv);
-  }
-
-  function exportCryptoCSV() {
-    const csv = toCSV(["symbol", "pct_24h", "pct_7d"], crypto, (r) => [r.symbol, r.pct_24h ?? "", r.pct_7d ?? ""]);
-    download("crypto.csv", csv);
-  }
-
-  function exportOptionsCSV() {
-    const csv = toCSV(
-      ["symbol", "type", "strike", "expiry", "delta", "bid", "ask", "spread", "premium"],
-      options,
-      (r) => [r.symbol, r.type, r.strike, r.expiry, r.delta ?? "", r.bid ?? "", r.ask ?? "", r.spread ?? "", r.premium ?? ""]
-    );
-    download("options.csv", csv);
-  }
-
-  /** Render helpers */
-  function Shimmer() {
-    return (
-      <div className="grid">
-        {[...Array(6)].map((_, i) => (
-          <div key={i} className="card shimmer" />
-        ))}
-      </div>
-    );
-  }
-
-  function Empty({ label }: { label: string }) {
-    return (
-      <div className="empty">
-        <div>No {label} yet.</div>
-        <div className="hint">Click Refresh to reload your latest feeds.</div>
-      </div>
-    );
+  async function handleBuy() {
+    const host = containerRef.current;
+    if (host) fireConfetti(host);
+    await sleep(200);
+    window.open("https://buy.stripe.com/test_abc123", "_blank", "noopener");
   }
 
   return (
-    <>
-      <style>{styles}</style>
-      <div className="wrap">
-        {/* Header */}
-        <header className="header">
-          <div className="brand">
-            <img className="logo" src="/logo.png" alt="Logiq Lion" />
-            <div className="title">
-              <div className="word">LOGIQ</div>
-              <div className="word glow">Signals</div>
-            </div>
+    <div ref={containerRef} style={{ position: "relative", minHeight: "100vh" }}>
+      <style>{css}</style>
+      {/* Header */}
+      <header className="hero">
+        <div className="brand">
+          <img src="/logo.png" alt="LogiqSignals" className="logo" />
+          <div className="title">
+            <span className="word">Logiq</span>
+            <span className="word glow">Signals</span>
+            <span className="tm">™</span>
           </div>
+          <div className="tag">Trade clarity. Faster.</div>
+        </div>
 
-          <div className="actions">
-            <button
-              className="btn"
-              onClick={() => {
-                pingSound();
-                loadAll();
-              }}
-              disabled={loading}
-              title="Refresh feeds"
-            >
-              {loading ? "Refreshing…" : "Refresh"}
-              <span className="ripple" />
-            </button>
+        <div className="cta">
+          <button className="buy" onClick={handleBuy}>
+            Start now – $29/mo
+          </button>
+          <button className="refresh" onClick={loadFeeds} disabled={loading}>
+            {loading ? "Refreshing…" : "Refresh data"}
+          </button>
+        </div>
+      </header>
 
-            <button
-              ref={buyRef}
-              className="btn primary slidein"
-              onClick={(e) => {
-                const el = e.currentTarget;
-                pingSound();
-                confettiBurst(el);
-                setTimeout(() => {
-                  // TODO: replace with your real checkout URL
-                  window.open("https://buy.stripe.com/test_abc123", "_blank", "noopener,noreferrer");
-                }, 380);
-              }}
-              title="Buy access"
-            >
-              Buy Access
-              <span className="sparkle" />
-            </button>
-          </div>
-        </header>
+      {/* Tabs */}
+      <nav className="tabs">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            className={`tab ${tab === t.key ? "active" : ""}`}
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
+            <span className="pill">{totals[t.key]}</span>
+          </button>
+        ))}
+      </nav>
 
-        {/* Tabs */}
-        <nav className="tabs">
-          {[
-            ["intraday", "Intraday"],
-            ["swing", "Swing"],
-            ["crypto", "Crypto"],
-            ["options", "Options"],
-          ].map(([key, label]) => (
-            <button
-              key={key}
-              className={`tab ${tab === key ? "active" : ""}`}
-              onClick={() => setTab(key as any)}
-              title={String(label)}
-            >
-              <span>{label}</span>
-              <span className="underline" />
-            </button>
-          ))}
-        </nav>
+      {/* Content */}
+      <main className="content">
+        {err && <div className="error">⚠️ {err}</div>}
 
-        {/* Content */}
-        <main className="main">
-          {loading && <Shimmer />}
+        {tab === "intraday" && (
+          <FeedGrid
+            title="Intraday – ORB + EMA"
+            rows={intraday.data}
+            columns={[
+              { key: "symbol", label: "Symbol" },
+              { key: "timeframe", label: "TF", width: 90 },
+              { key: "prob", label: "Score", render: (v) => pct(v) },
+              { key: "entry", label: "Entry", render: fmt },
+              { key: "stop", label: "Stop", render: fmt },
+              { key: "targets", label: "Targets", render: (t: any[]) => (t?.length ? t.join(" • ") : "—") },
+              { key: "note", label: "Note", width: 280 },
+            ]}
+            emptyHint="No intraday setups yet. Refresh after market opens."
+          />
+        )}
 
-          {!loading && tab === "intraday" && (
-            <>
-              {intraday.length === 0 ? (
-                <Empty label="intraday signals" />
-              ) : (
-                <section>
-                  <div className="toolbar">
-                    <div className="subtitle">AI-weighted 15m ORB/EMA</div>
-                    <div className="right">
-                      <button className="btn ghost" onClick={exportIntradayCSV}>
-                        Export CSV
-                      </button>
-                    </div>
-                  </div>
+        {tab === "swing" && (
+          <FeedGrid
+            title="Swing (1–2 weeks)"
+            rows={swing.data}
+            columns={[
+              { key: "ticker", label: "Symbol" },
+              { key: "timeframe", label: "TF", width: 90 },
+              { key: "prob", label: "Score", render: (v) => pct(v) },
+              { key: "entry", label: "Entry", render: fmt },
+              { key: "stop", label: "Stop", render: fmt },
+              { key: "targets", label: "Targets", render: (t: any[]) => (t?.length ? t.join(" • ") : "—") },
+              { key: "trail", label: "Trail", render: (t: AnyRow) => (t ? `${t.method || "—"}` : "—") },
+            ]}
+            emptyHint="No swing setups passed the filters today."
+          />
+        )}
 
-                  <div className="grid">
-                    {intraday.map((r, i) => (
-                      <article className="card" key={r.symbol + i}>
-                        <div className="chip">#{i + 1}</div>
-                        <div className="sym">{r.symbol}</div>
-                        <div className="meta">
-                          <span className="tag">score</span>
-                          <span className="val">{(r.score ?? 0).toFixed(2)}</span>
-                        </div>
-                        {r.note && <div className="note">{r.note}</div>}
+        {tab === "crypto" && (
+          <FeedGrid
+            title="Crypto movers (24h / 7d)"
+            rows={crypto.data}
+            columns={[
+              { key: "symbol", label: "Coin" },
+              { key: "price", label: "Price", render: (v) => fmt(v, 4) },
+              { key: "chg_24h", label: "24h", render: (v) => (v == null ? "—" : `${fmt(v, 2)}%`) },
+              { key: "chg_7d", label: "7d", render: (v) => (v == null ? "—" : `${fmt(v, 2)}%`) },
+              { key: "vol", label: "Vol", render: kmb },
+              { key: "note", label: "Note", width: 280 },
+            ]}
+            emptyHint="No crypto movers yet."
+          />
+        )}
 
-                        <div className="row">
-                          <span className="mini">timeframe</span>
-                          <span className="mini dim">{r.timeframe || "15m"}</span>
-                        </div>
-                        <div className="row">
-                          <span className="mini">as of</span>
-                          <span className="mini dim">{r.asof || "—"}</span>
-                        </div>
+        {tab === "options" && (
+          <FeedGrid
+            title="Options picks (Δ .50–.80, tight spreads)"
+            rows={options.data}
+            columns={[
+              { key: "symbol", label: "Symbol" },
+              { key: "type", label: "Type", width: 90 },
+              { key: "strike", label: "Strike", render: fmt },
+              { key: "expiry", label: "Expiry" },
+              { key: "delta", label: "Δ", render: fmt },
+              { key: "spread", label: "Spread", render: fmt },
+              { key: "rr", label: "R:R", render: fmt },
+              { key: "note", label: "Why this", width: 280 },
+            ]}
+            emptyHint="No option contracts passed filters. Try Refresh or relax filters in the engine."
+          />
+        )}
+      </main>
 
-                        <div className="cta">
-                          <a className="btn small ghost" href="/signals.json" target="_blank" rel="noreferrer">
-                            View JSON
-                          </a>
-                          <button className="btn small" onClick={exportIntradayCSV}>
-                            Save CSV
-                          </button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                </section>
-              )}
-            </>
-          )}
-
-          {!loading && tab === "swing" && (
-            <>
-              {swing.length === 0 ? (
-                <Empty label="swing signals" />
-              ) : (
-                <section>
-                  <div className="toolbar">
-                    <div className="subtitle">Daily EMA break & retest (1–2w)</div>
-                    <div className="right">
-                      <button className="btn ghost" onClick={exportSwingCSV}>
-                        Export CSV
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid">
-                    {swing.map((r, i) => (
-                      <article className="card" key={r.ticker + i}>
-                        <div className="chip">#{i + 1}</div>
-                        <div className="sym">{r.ticker}</div>
-
-                        <div className="pillwrap">
-                          <span className="pill">
-                            prob <b>{(r.prob ?? 0).toFixed(2)}</b>
-                          </span>
-                          <span className="pill">
-                            entry <b>{r.entry ?? "—"}</b>
-                          </span>
-                          <span className="pill">
-                            stop <b>{r.stop ?? "—"}</b>
-                          </span>
-                        </div>
-
-                        <div className="targets">
-                          {(r.targets || []).slice(0, 3).map((t, j) => (
-                            <span className="tg" key={j}>
-                              T{j + 1} {t}
-                            </span>
-                          ))}
-                        </div>
-
-                        <div className="row">
-                          <span className="mini">as of</span>
-                          <span className="mini dim">{r.asof || "—"}</span>
-                        </div>
-
-                        <div className="cta">
-                          <a className="btn small ghost" href="/signals_swing.json" target="_blank" rel="noreferrer">
-                            View JSON
-                          </a>
-                          <button className="btn small" onClick={exportSwingCSV}>
-                            Save CSV
-                          </button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                </section>
-              )}
-            </>
-          )}
-
-          {!loading && tab === "crypto" && (
-            <>
-              {crypto.length === 0 ? (
-                <Empty label="crypto movers" />
-              ) : (
-                <section>
-                  <div className="toolbar">
-                    <div className="subtitle">Top Crypto Movers</div>
-                    <div className="right">
-                      <button className="btn ghost" onClick={exportCryptoCSV}>
-                        Export CSV
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid">
-                    {crypto.map((r, i) => (
-                      <article className="card" key={r.symbol + i}>
-                        <div className="chip">#{i + 1}</div>
-                        <div className="sym">{r.symbol}</div>
-                        <div className="row">
-                          <span className="mini">24h</span>
-                          <span className={`mini ${numClass(r.pct_24h)}`}>{fmtPct(r.pct_24h)}</span>
-                        </div>
-                        <div className="row">
-                          <span className="mini">7d</span>
-                          <span className={`mini ${numClass(r.pct_7d)}`}>{fmtPct(r.pct_7d)}</span>
-                        </div>
-
-                        <div className="cta">
-                          <a className="btn small ghost" href="/crypto_movers.json" target="_blank" rel="noreferrer">
-                            View JSON
-                          </a>
-                          <button className="btn small" onClick={exportCryptoCSV}>
-                            Save CSV
-                          </button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                </section>
-              )}
-            </>
-          )}
-
-          {!loading && tab === "options" && (
-            <>
-              {options.length === 0 ? (
-                <Empty label="options picks" />
-              ) : (
-                <section>
-                  <div className="toolbar">
-                    <div className="subtitle">Options Scanner (δ .50–.80, tight spreads)</div>
-                    <div className="right">
-                      <button className="btn ghost" onClick={exportOptionsCSV}>
-                        Export CSV
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid">
-                    {options.map((r, i) => (
-                      <article className="card" key={r.symbol + i}>
-                        <div className="chip">#{i + 1}</div>
-                        <div className="sym">{r.symbol}</div>
-
-                        <div className="pillwrap">
-                          <span className="pill">{r.type}</span>
-                          <span className="pill">K {r.strike}</span>
-                          <span className="pill">{r.expiry}</span>
-                        </div>
-
-                        <div className="row">
-                          <span className="mini">δ</span>
-                          <span className="mini dim">{r.delta ?? "—"}</span>
-                        </div>
-                        <div className="row">
-                          <span className="mini">Bid/Ask</span>
-                          <span className="mini dim">
-                            {r.bid ?? "—"} / {r.ask ?? "—"}{" "}
-                            <span className="ghosty">({r.spread ?? "—"})</span>
-                          </span>
-                        </div>
-
-                        <div className="cta">
-                          <a className="btn small ghost" href="/options.json" target="_blank" rel="noreferrer">
-                            View JSON
-                          </a>
-                          <button className="btn small" onClick={exportOptionsCSV}>
-                            Save CSV
-                          </button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                </section>
-              )}
-            </>
-          )}
-        </main>
-
-        {/* Footer helper */}
-        <footer className="foot">
-          {!anyData && !loading && (
-            <div className="hint">
-              Heads up: If the market is closed or feeds are empty, click <b>Refresh</b> after you generate JSON in
-              <code className="mono"> signals-engine/output </code> and copy them to <code className="mono">public</code>.
-            </div>
-          )}
-          <div className="tiny">© {new Date().getFullYear()} LogiqSignals — edge for humans.</div>
-        </footer>
-      </div>
-    </>
+      {/* Footer */}
+      <footer className="foot">
+        <span>© {new Date().getFullYear()} LogiqSignals — All rights reserved.</span>
+        <a href="mailto:support@logiqsignals.com">support@logiqsignals.com</a>
+      </footer>
+    </div>
   );
 }
 
-/** ===========================
- *  Local helpers
- *  =========================== */
-function fmtPct(n?: number) {
-  if (n === undefined || n === null || Number.isNaN(n)) return "—";
-  const sign = n >= 0 ? "+" : "";
-  return `${sign}${n.toFixed(2)}%`;
-}
-function numClass(n?: number) {
-  if (n === undefined || n === null || Number.isNaN(n)) return "";
-  return n >= 0 ? "pos" : "neg";
+/** ---------- Reusable grid ---------- */
+function FeedGrid({
+  title,
+  rows,
+  columns,
+  emptyHint,
+}: {
+  title: string;
+  rows: AnyRow[];
+  columns: { key: string; label: string; width?: number; render?: (v: any) => React.ReactNode }[];
+  emptyHint?: string;
+}) {
+  const hasRows = Array.isArray(rows) && rows.length > 0;
+  return (
+    <section className="panel">
+      <div className="panel-head">
+        <h2>{title}</h2>
+        <div className="meta">{hasRows ? `${rows.length} items` : "—"}</div>
+      </div>
+
+      {!hasRows && <div className="empty">{emptyHint || "No data"}</div>}
+
+      {hasRows && (
+        <div className="grid">
+          <div className="grid-row header">
+            {columns.map((c) => (
+              <div key={c.key} className="cell" style={{ width: c.width }}>
+                {c.label}
+              </div>
+            ))}
+          </div>
+          {rows.map((r, i) => (
+            <div key={i} className="grid-row card-row">
+              {columns.map((c) => {
+                const raw = r[c.key];
+                const val = c.render ? c.render(raw) : raw ?? "—";
+                return (
+                  <div key={c.key} className="cell" style={{ width: c.width }}>
+                    {val}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
 }
 
-/** ===========================
- *  Styles (no external libs)
- *  =========================== */
-const styles = `
+/** ---------- CSS-in-file (stable) ---------- */
+const css = `
 :root{
   --bg:#0b0b12;
-  --panel:#0d0f1a;
-  --glass:rgba(255,255,255,.06);
-  --text:#e9e9f1;
-  --muted:#a8a8b8;
-  --brand-1:#7c3aed;
-  --brand-2:#06b6d4;
-  --brand-3:#22c55e;
-  --accent:#e879f9;
+  --card:#12121a;
+  --ink:#d7e3ff;
+  --muted:#8ea3c7;
+  --accent:#22d3ee;
+  --accent2:#a855f7;
+  --line:rgba(255,255,255,.06);
 }
+
 *{box-sizing:border-box}
 html,body,#root{height:100%}
-body{margin:0; background: radial-gradient(1200px 700px at 10% -10%, rgba(124,58,237,.22), rgba(124,58,237,0) 60%) ,linear-gradient(180deg,#0a0a11 0%, #0b0c14 60%, #0a0a11 100%); color:var(--text); font: 14px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif}
-a{color:inherit}
+body{
+  margin:0; font-family: ui-sans-serif,system-ui,Arial,Segoe UI;
+  background: radial-gradient(60% 70% at 50% 0%, rgba(34,211,238,.12), transparent 60%),
+              radial-gradient(50% 50% at 90% 10%, rgba(168,85,247,.12), transparent 60%),
+              var(--bg);
+  color:var(--ink);
+}
 
-.wrap{max-width:1160px; margin:0 auto; padding:28px 18px 40px}
+.hero{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:24px; padding:28px 20px 18px;
+  border-bottom:1px solid var(--line);
+  position:sticky; top:0; backdrop-filter: blur(8px);
+  background: linear-gradient(180deg, rgba(11,11,18,.72), rgba(11,11,18,.35) 60%, transparent);
+  z-index:10;
+}
+.brand{display:flex; align-items:center; gap:16px; position:relative}
+.logo{
+  width:200px; height:200px; border-radius:50%; object-fit:cover;
+  box-shadow: 0 0 0 4px rgba(34,211,238,.18), 0 18px 42px rgba(168,85,247,.45);
+  animation:pulse 3s ease-in-out infinite;
+  filter: brightness(1.2) saturate(1.15);
+}
+@media (max-width:640px){ .logo{ width:140px; height:140px; } }
 
-.header{display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 16px; border-radius:16px; background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03)); border:1px solid rgba(255,255,255,.08); box-shadow: 0 10px 28px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.06); position:sticky; top:12px; backdrop-filter: blur(10px); z-index:5}
-.brand{display:flex; align-items:center; gap:14px}
-.logo{width:168px; height:168px; border-radius:50%; object-fit:cover; filter: drop-shadow(0 10px 32px rgba(124,58,237,.55)) brightness(1.17); animation: pulse 3s ease-in-out infinite}
-@keyframes pulse{0%,100%{transform:translateZ(0) scale(1)}50%{transform:translateZ(0) scale(1.03)}}
-
-.title{display:flex; flex-direction:column; line-height:1}
-.title .word{font-weight:800; letter-spacing:.6px; font-size:22px}
+.title{ font-size: clamp(24px, 4vw, 38px); font-weight:800; letter-spacing:.5px }
+.title .word{ background: linear-gradient(180deg, #e2e8f0, #cbd5e1 60%, #93c5fd);
+  -webkit-background-clip:text; background-clip:text; color:transparent }
 .title .word.glow{
-  font-size:28px; letter-spacing:1px;
-  background: linear-gradient(92deg,var(--brand-1),var(--brand-2),var(--brand-3));
-  -webkit-background-clip:text; background-clip:text; color:transparent;
-  filter: drop-shadow(0 6px 20px rgba(6,182,212,.25));
+  background: linear-gradient(90deg, #67e8f9, #a78bfa 60%, #60a5fa);
+  filter: drop-shadow(0 8px 26px rgba(6,182,212,.32));
+}
+.title .tm{ font-size:.6em; color:var(--muted); margin-left:6px }
+
+.tag{ color:var(--muted); font-size:13px; margin-top:4px }
+
+.cta{ display:flex; gap:12px }
+.buy{
+  padding:10px 16px; border-radius:999px; border:0; cursor:pointer;
+  color:#061018; font-weight:800; letter-spacing:.3px;
+  background: linear-gradient(90deg, #22d3ee, #a855f7);
+  box-shadow: 0 8px 26px rgba(168,85,247,.35);
+  transition:.2s transform ease, .2s filter ease;
+}
+.buy:hover{ transform: translateY(-1px); filter: brightness(1.05) }
+.refresh{
+  padding:10px 14px; border-radius:999px; border:1px solid var(--line); cursor:pointer;
+  background: rgba(255,255,255,.04); color:var(--ink);
 }
 
-.actions{display:flex; align-items:center; gap:10px}
-.btn{
-  position:relative; border:none; border-radius:12px; padding:10px 14px;
-  background: rgba(255,255,255,.06); color:var(--text); cursor:pointer;
-  transition: transform .12s ease, background .2s ease, box-shadow .2s ease;
-  box-shadow: 0 6px 18px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.06);
-  backdrop-filter: blur(6px);
+.tabs{
+  display:flex; gap:8px; padding:10px 12px; border-bottom:1px solid var(--line);
+  position:sticky; top:86px; background:rgba(11,11,18,.65); backdrop-filter: blur(6px); z-index:9;
 }
-.btn:hover{ transform: translateY(-1px); background: rgba(255,255,255,.09)}
-.btn:active{ transform: translateY(0)}
-.btn.primary{
-  background: linear-gradient(92deg,var(--brand-1),var(--brand-2),var(--brand-3));
-  color:#0b0b12; font-weight:700;
-  box-shadow: 0 8px 24px rgba(124,58,237,.45);
-}
-.btn.primary:hover{ filter: brightness(1.05)}
-.btn.ghost{ background: rgba(255,255,255,.04)}
-.btn.small{ padding:8px 10px; border-radius:10px; font-size:12px}
-.btn:disabled{opacity:.6; cursor:not-allowed}
-.ripple::after{
-  content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
-  background: radial-gradient(120px 80px at var(--mx,50%) var(--my,50%), rgba(255,255,255,.14), transparent 60%);
-  opacity:0; transition: opacity .2s ease;
-}
-.btn:hover .ripple::after{opacity:1}
-
-.sparkle{position:absolute; right:10px; top:8px; width:6px; height:6px; border-radius:50%; background:#fff; box-shadow: 0 0 18px 6px rgba(255,255,255,.45); opacity:.85; animation: twinkle 2.4s infinite}
-@keyframes twinkle{0%,100%{transform:scale(.8); opacity:.45}50%{transform:scale(1.2); opacity:.95}}
-
-.slidein{ transform: translateY(16px); opacity:0}
-.slidein.in{ transform: translateY(0); opacity:1; transition: transform .45s cubic-bezier(.2,.8,.2,1), opacity .4s ease .05s}
-
-.tabs{ display:flex; gap:10px; padding:14px 2px 0; margin-top:12px; position:sticky; top:100px; z-index:4; background: transparent}
 .tab{
-  position:relative; padding:10px 14px; border-radius:12px; color:var(--muted);
-  background: rgba(255,255,255,.02); border:1px solid rgba(255,255,255,.06);
-  transition: color .2s ease, background .2s ease;
+  position:relative; padding:10px 14px; border-radius:12px; border:1px solid var(--line);
+  background:rgba(255,255,255,.02); color:var(--ink); cursor:pointer; font-weight:700;
+  transition:.2s ease;
 }
-.tab:hover{ color:#fff; background: rgba(255,255,255,.05)}
-.tab.active{ color:#fff; background: rgba(255,255,255,.08)}
-.tab .underline{
-  position:absolute; left:16px; right:16px; bottom:6px; height:3px;
-  background:
-    radial-gradient(40% 200% at 50% 50%, rgba(255,255,255,.75), rgba(255,255,255,0) 70%),
-    linear-gradient(90deg, var(--brand-1), var(--brand-2), var(--brand-3));
-  border-radius:999px; transform: scaleX(.3); opacity:0; filter: blur(.2px);
-  transition: transform .22s cubic-bezier(.2,.8,.2,1), opacity .2s ease;
+.tab.active{
+  background: linear-gradient(90deg, rgba(34,211,238,.18), rgba(168,85,247,.18));
+  border-color: rgba(255,255,255,.18);
+  box-shadow: inset 0 0 20px rgba(34,211,238,.12);
 }
-.tab:hover .underline{ opacity:.65; transform: scaleX(.7)}
-.tab.active .underline{ opacity:1; transform: scaleX(1)}
-
-.main{ margin-top:18px}
-.toolbar{display:flex; align-items:center; justify-content:space-between; margin:10px 2px 18px}
-.subtitle{color:#d8d8e6; font-weight:700; letter-spacing:.3px}
-.right{display:flex; align-items:center; gap:10px}
-
-.grid{display:grid; grid-template-columns: repeat( auto-fill, minmax(260px, 1fr) ); gap:14px}
-.card{
-  position:relative; padding:14px; border-radius:16px;
-  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
-  border:1px solid rgba(255,255,255,.08);
-  box-shadow: 0 12px 28px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.06);
-  transition: transform .15s ease, box-shadow .2s ease, background .2s ease;
-  overflow:hidden;
-}
-.card::before{
-  content:""; position:absolute; inset:-40px; background:
-    radial-gradient(400px 100px at var(--hx,20%) var(--hy,0%), rgba(124,58,237,.15), transparent 60%),
-    radial-gradient(400px 100px at var(--hx2,80%) var(--hy2,100%), rgba(6,182,212,.12), transparent 60%);
-  filter: blur(18px); opacity:.8; transition: opacity .25s ease;
-}
-.card:hover{ transform: translateY(-3px); box-shadow: 0 16px 36px rgba(0,0,0,.32)}
-.card:hover::before{ opacity:1}
-
-.card.shimmer{
-  min-height:160px;
-  background: linear-gradient(110deg, rgba(255,255,255,.06) 8%, rgba(255,255,255,.13) 18%, rgba(255,255,255,.06) 33%);
-  background-size: 200% 100%;
-  animation: shine 1.1s linear infinite;
-}
-@keyframes shine { to { background-position-x: -200% } }
-
-.chip{ position:absolute; top:10px; right:12px; font-size:11px; color:#fff; opacity:.6}
-.sym{ font-size:22px; font-weight:800; letter-spacing:.6px; margin-bottom:6px}
-.meta{ display:flex; align-items:center; gap:8px; margin:6px 0 8px}
-.tag{ font-size:11px; color:#aaa; border:1px dashed rgba(255,255,255,.18); padding:2px 6px; border-radius:8px}
-.val{ font-weight:700}
-
-.note{ font-size:12px; color:#d8d8e6; opacity:.9; background: rgba(255,255,255,.05); padding:8px; border-radius:10px; border:1px solid rgba(255,255,255,.06); margin:8px 0}
-
-.pillwrap{display:flex; flex-wrap:wrap; gap:6px; margin:8px 0}
-.pill{ font-size:11px; padding:6px 8px; border-radius:999px; color:#0b0b12; font-weight:700;
-  background: linear-gradient(92deg, var(--brand-1), var(--brand-2), var(--brand-3)); box-shadow: inset 0 1px 0 rgba(255,255,255,.3)
+.pill{
+  margin-left:8px; background:rgba(255,255,255,.12); padding:2px 8px;
+  border-radius:999px; font-size:12px;
 }
 
-.targets{ display:flex; gap:8px; flex-wrap:wrap; margin:6px 0 8px}
-.tg{ font-size:11px; color:#dfe; background: rgba(34,197,94,.18); border:1px solid rgba(34,197,94,.35); padding:4px 8px; border-radius:8px }
+.content{ padding:22px 14px 80px; max-width:1200px; margin:0 auto }
 
-.row{ display:flex; align-items:center; justify-content:space-between; margin:4px 0}
-.mini{ font-size:12px}
-.dim{ color:#bcbcd0}
-.ghosty{ opacity:.6}
+.panel{ background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.03));
+  border:1px solid var(--line); border-radius:18px; padding:14px; margin-top:16px;
+  box-shadow: 0 10px 28px rgba(0,0,0,.28), inset 0 1px rgba(255,255,255,.05);
+}
+.panel-head{ display:flex; align-items:baseline; justify-content:space-between; margin:2px 4px 12px }
+.panel-head h2{ margin:0; font-size:18px }
+.meta{ color:var(--muted); font-size:12px }
 
-.cta{ display:flex; gap:8px; margin-top:10px}
+.grid{ width:100%; border-top:1px dashed var(--line) }
+.grid-row{
+  display:grid; grid-template-columns: repeat(8, minmax(0,1fr)); gap:10px;
+  padding:12px 8px; align-items:center; border-bottom:1px dashed var(--line);
+  transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+.header{ font-weight:700; color:#cbe3ff; background:rgba(255,255,255,.02) }
+.card-row:hover{
+  background: radial-gradient(60% 120% at 10% 50%, rgba(34,211,238,.10), transparent 60%),
+              radial-gradient(60% 120% at 90% 50%, rgba(168,85,247,.10), transparent 60%);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(0,0,0,.25);
+}
+.cell{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.cell:nth-child(1){ grid-column: span 1 }
+.cell:nth-child(2){ grid-column: span 1 }
+.cell:nth-child(3){ grid-column: span 1 }
+.cell:nth-child(4){ grid-column: span 1 }
+.cell:nth-child(5){ grid-column: span 1 }
+.cell:nth-child(6){ grid-column: span 2 }
+.cell:nth-child(7){ grid-column: span 1 }
+@media (max-width: 920px){
+  .grid-row{ grid-template-columns: repeat(6, minmax(0,1fr)); }
+  .cell:nth-child(6){ grid-column: span 3 }
+}
+@media (max-width: 640px){
+  .grid-row{ grid-template-columns: repeat(4, minmax(0,1fr)); }
+  .cell:nth-child(6){ grid-column: span 4 }
+}
 
-.empty{ text-align:center; padding:36px 10px; border:1px dashed rgba(255,255,255,.15); border-radius:14px; color:#cfd0df; background: rgba(255,255,255,.02)}
-.hint{ opacity:.8; font-size:12px; margin-top:6px}
-.mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; background: rgba(255,255,255,.06); padding:0 6px; border-radius:6px}
+.empty{
+  padding:28px 10px; text-align:center; color:var(--muted);
+  background: repeating-linear-gradient(45deg, rgba(255,255,255,.02) 0 10px, transparent 10px 20px);
+  border-radius:12px; border:1px dashed var(--line); margin:12px 4px;
+}
 
-.foot{ margin-top:28px; opacity:.8; text-align:center}
-.tiny{ font-size:12px; color:#a8a8b8}
+.error{
+  color:#fecaca; background: rgba(220,38,38,.18);
+  border:1px solid rgba(220,38,38,.35); padding:10px 12px; border-radius:12px; margin-bottom:12px;
+}
 
-.pos{ color:#53f29a}
-.neg{ color:#f36d7a}
+.foot{
+  color:var(--muted);
+  display:flex; justify-content:space-between; gap:12px; align-items:center;
+  padding:14px 16px; border-top:1px solid var(--line); margin-top:22px; font-size:13px;
+}
 
-.confetti{ position: fixed; inset: 0; pointer-events: none; z-index: 9999; }
+@keyframes pulse{
+  0%,100%{ transform:scale(1); }
+  50%{ transform:scale(1.03); }
+}
 `;

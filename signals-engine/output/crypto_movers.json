@@ -1,142 +1,142 @@
 [
   {
     "symbol": "APT-USD",
-    "price": 5.52,
-    "change24h": 7.41,
-    "vol24h": 678764727.0,
-    "asof": "2025-10-05 16:29:38 UTC"
+    "price": 5.49,
+    "change24h": 5.98,
+    "vol24h": 676450559.0,
+    "asof": "2025-10-05 18:11:36 UTC"
   },
   {
     "symbol": "NEAR-USD",
-    "price": 3.02,
-    "change24h": 4.63,
-    "vol24h": 324149505.0,
-    "asof": "2025-10-05 16:29:38 UTC"
-  },
-  {
-    "symbol": "ARB-USD",
-    "price": 0.44,
-    "change24h": 3.89,
-    "vol24h": 196690941.0,
-    "asof": "2025-10-05 16:29:38 UTC"
+    "price": 2.98,
+    "change24h": 2.4,
+    "vol24h": 334361929.0,
+    "asof": "2025-10-05 18:11:36 UTC"
   },
   {
     "symbol": "FIL-USD",
-    "price": 2.37,
-    "change24h": 3.73,
-    "vol24h": 154727369.0,
-    "asof": "2025-10-05 16:29:38 UTC"
-  },
-  {
-    "symbol": "ICP-USD",
-    "price": 4.61,
-    "change24h": 3.65,
-    "vol24h": 54790653.0,
-    "asof": "2025-10-05 16:29:38 UTC"
+    "price": 2.34,
+    "change24h": 2.18,
+    "vol24h": 161780427.0,
+    "asof": "2025-10-05 18:11:36 UTC"
   },
   {
     "symbol": "DOGE-USD",
-    "price": 0.26,
-    "change24h": 3.54,
-    "vol24h": 2706548432.0,
-    "asof": "2025-10-05 16:29:38 UTC"
+    "price": 0.25,
+    "change24h": 2.07,
+    "vol24h": 2873905145.0,
+    "asof": "2025-10-05 18:11:36 UTC"
   },
   {
-    "symbol": "RNDR-USD",
-    "price": 3.55,
-    "change24h": 3.44,
-    "vol24h": 64166369.0,
-    "asof": "2025-10-05 16:29:38 UTC"
+    "symbol": "ICP-USD",
+    "price": 4.55,
+    "change24h": 1.88,
+    "vol24h": 60525726.0,
+    "asof": "2025-10-05 18:11:36 UTC"
   },
   {
     "symbol": "UNI-USD",
-    "price": 8.2,
-    "change24h": 3.42,
-    "vol24h": 258520750.0,
-    "asof": "2025-10-05 16:29:38 UTC"
+    "price": 8.11,
+    "change24h": 1.75,
+    "vol24h": 258564432.0,
+    "asof": "2025-10-05 18:11:36 UTC"
   },
   {
     "symbol": "SHIB-USD",
     "price": 0.0,
-    "change24h": 3.27,
-    "vol24h": 308471893.0,
-    "asof": "2025-10-05 16:29:38 UTC"
+    "change24h": 1.73,
+    "vol24h": 287898466.0,
+    "asof": "2025-10-05 18:11:36 UTC"
   },
   {
     "symbol": "LINK-USD",
-    "price": 22.52,
-    "change24h": 2.99,
-    "vol24h": 800327467.0,
-    "asof": "2025-10-05 16:29:38 UTC"
+    "price": 22.25,
+    "change24h": 1.44,
+    "vol24h": 809778166.0,
+    "asof": "2025-10-05 18:11:36 UTC"
   },
   {
     "symbol": "ATOM-USD",
-    "price": 4.22,
-    "change24h": 2.91,
-    "vol24h": 104200121.0,
-    "asof": "2025-10-05 16:29:38 UTC"
+    "price": 4.18,
+    "change24h": 1.43,
+    "vol24h": 106870720.0,
+    "asof": "2025-10-05 18:11:36 UTC"
+  },
+  {
+    "symbol": "XRP-USD",
+    "price": 2.99,
+    "change24h": 1.28,
+    "vol24h": 4606223595.0,
+    "asof": "2025-10-05 18:11:36 UTC"
+  },
+  {
+    "symbol": "ARB-USD",
+    "price": 0.44,
+    "change24h": 1.06,
+    "vol24h": 199574078.0,
+    "asof": "2025-10-05 18:11:36 UTC"
   },
   {
     "symbol": "SOL-USD",
-    "price": 230.24,
-    "change24h": 2.46,
-    "vol24h": 6551045330.0,
-    "asof": "2025-10-05 16:29:38 UTC"
-  },
-  {
-    "symbol": "DOT-USD",
-    "price": 4.24,
-    "change24h": 2.3,
-    "vol24h": 227113845.0,
-    "asof": "2025-10-05 16:29:38 UTC"
+    "price": 229.18,
+    "change24h": 1.0,
+    "vol24h": 6654134615.0,
+    "asof": "2025-10-05 18:11:36 UTC"
   },
   {
     "symbol": "SUI-USD",
-    "price": 3.6,
-    "change24h": 2.15,
-    "vol24h": 1246429458.0,
-    "asof": "2025-10-05 16:29:38 UTC"
+    "price": 3.57,
+    "change24h": 0.98,
+    "vol24h": 1221326726.0,
+    "asof": "2025-10-05 18:11:36 UTC"
+  },
+  {
+    "symbol": "BNB-USD",
+    "price": 1159.16,
+    "change24h": 0.96,
+    "vol24h": 2393749736.0,
+    "asof": "2025-10-05 18:11:36 UTC"
+  },
+  {
+    "symbol": "BTC-USD",
+    "price": 122994.0,
+    "change24h": 0.94,
+    "vol24h": 68503848066.0,
+    "asof": "2025-10-05 18:11:36 UTC"
+  },
+  {
+    "symbol": "ETH-USD",
+    "price": 4507.94,
+    "change24h": 0.91,
+    "vol24h": 38626154411.0,
+    "asof": "2025-10-05 18:11:36 UTC"
+  },
+  {
+    "symbol": "ADA-USD",
+    "price": 0.84,
+    "change24h": 0.78,
+    "vol24h": 1343822132.0,
+    "asof": "2025-10-05 18:11:36 UTC"
+  },
+  {
+    "symbol": "RNDR-USD",
+    "price": 3.5,
+    "change24h": 0.75,
+    "vol24h": 66295004.0,
+    "asof": "2025-10-05 18:11:36 UTC"
+  },
+  {
+    "symbol": "LTC-USD",
+    "price": 119.25,
+    "change24h": 0.59,
+    "vol24h": 793263360.0,
+    "asof": "2025-10-05 18:11:36 UTC"
   },
   {
     "symbol": "HBAR-USD",
     "price": 0.22,
-    "change24h": 2.05,
-    "vol24h": 208254132.0,
-    "asof": "2025-10-05 16:29:38 UTC"
-  },
-  {
-    "symbol": "XRP-USD",
-    "price": 3.01,
-    "change24h": 1.97,
-    "vol24h": 4568698517.0,
-    "asof": "2025-10-05 16:29:38 UTC"
-  },
-  {
-    "symbol": "ADA-USD",
-    "price": 0.85,
-    "change24h": 1.97,
-    "vol24h": 1137949131.0,
-    "asof": "2025-10-05 16:29:38 UTC"
-  },
-  {
-    "symbol": "ETH-USD",
-    "price": 4536.13,
-    "change24h": 1.74,
-    "vol24h": 37457563128.0,
-    "asof": "2025-10-05 16:29:38 UTC"
-  },
-  {
-    "symbol": "BNB-USD",
-    "price": 1160.03,
-    "change24h": 1.58,
-    "vol24h": 2474502813.0,
-    "asof": "2025-10-05 16:29:38 UTC"
-  },
-  {
-    "symbol": "LTC-USD",
-    "price": 120.01,
-    "change24h": 1.46,
-    "vol24h": 764404865.0,
-    "asof": "2025-10-05 16:29:38 UTC"
+    "change24h": 0.36,
+    "vol24h": 217956725.0,
+    "asof": "2025-10-05 18:11:36 UTC"
   }
 ]
