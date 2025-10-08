@@ -1,10 +1,12 @@
 [build]
-# Tell Netlify the app lives in this subfolder
-base    = "logiqsignals-site"
-# After cd into base, publish from the Vite dist
-publish = "dist"
-# Run install & build inside base
+base = "logiqsignals-site"
 command = "npm ci && npm run build"
+publish = "logiqsignals-site/dist"
 
 [build.environment]
 NODE_VERSION = "20"
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200
