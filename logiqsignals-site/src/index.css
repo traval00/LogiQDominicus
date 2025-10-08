@@ -1,5 +1,5 @@
-/* src/index.css */
-:root { color-scheme: light dark; }
-* { box-sizing: border-box; }
-html,body,#root { height: 100%; margin: 0; }
-body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+html, body, #root { height: 100%; margin: 0; font-family: system-ui, Arial, sans-serif; }
+table { border-collapse: collapse; width: 100%; }
+th, td { padding: 8px 12px; border-top: 1px solid #e5e7eb; }
+thead th { background: #f8fafc; text-align: left; }
+button { cursor: pointer; }

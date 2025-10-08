@@ -1,7 +1,7 @@
 [build]
 base = "logiqsignals-site"
 command = "npm ci && npm run build"
-publish = "logiqsignals-site/dist"
+publish = "dist"               # <-- fix: not logiqsignals-site/dist
 
 [build.environment]
 NODE_VERSION = "20"
