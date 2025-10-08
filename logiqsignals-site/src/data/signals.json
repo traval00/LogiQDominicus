@@ -1,0 +1,29 @@
+{
+  "updated": "2025-10-08T13:00:00Z",
+  "signals": [
+    {
+      "id": "1",
+      "ticker": "SPY",
+      "side": "LONG",
+      "entry": 428.5,
+      "stop": 426.9,
+      "target": 432,
+      "timeframe": "15m",
+      "strategy": "EMA20 Retest",
+      "status": "open",
+      "ts": "2025-10-08T12:55:00Z"
+    },
+    {
+      "id": "2",
+      "ticker": "TSLA",
+      "side": "SHORT",
+      "entry": 248.1,
+      "stop": 251.0,
+      "target": 242.0,
+      "timeframe": "5m",
+      "strategy": "VWAP Fade",
+      "status": "open",
+      "ts": "2025-10-08T12:50:00Z"
+    }
+  ]
+}
