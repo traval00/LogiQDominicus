@@ -1,24 +1,21 @@
 @echo off
-cd /d C:\Users\trave\Documents\LogiQDominicus\signals-engine
+setlocal
+cd /d %~dp0
 .\.venv\Scripts\activate
 
-echo === Options ===
-python options_picker.py
-
-echo === Crypto Movers ===
-python crypto_movers.py
-
-echo === Swing ===
-python run_swing.py
-
-echo === Intraday ===
+echo [1/2] Intraday/Crypto...
 python generate_signals.py
 
-echo === Copy to site/public ===
-copy ".\output\signals.json" "..\logiqsignals-site\public\signals.json" /Y
-copy ".\output\signals_swing.json" "..\logiqsignals-site\public\signals_swing.json" /Y
-copy ".\output\options.json" "..\logiqsignals-site\public\options.json" /Y
-copy ".\output\crypto_movers.json" "..\logiqsignals-site\public\crypto_movers.json" /Y
+echo [2/2] Swing...
+python run_swing.py
+
+echo Copying JSONs into site...
+set SRC=%CD%\output
+set DEST=C:\Users\trave\Documents\LogiQDominicus\logiqsignals-site\public\data
+
+if not exist "%DEST%" mkdir "%DEST%"
+copy /y "%SRC%\signals.json" "%DEST%\signals.json" >nul
+copy /y "%SRC%\signals_swing.json" "%DEST%\signals_swing.json" >nul
 
 echo Done.
-pause
+endlocal
