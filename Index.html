@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>LogiQ Signals — Live Dashboard</title>
+<meta name="description" content="Real-time LogiQ Signals dashboard: trades, monthly stats, win rate, R-multiple.">
+
+<style>
+  :root{
+    --bg:#0a0b0e; --panel:#0f1218; --panel2:#121622; --ink:#e7ebf3; --muted:#aeb6c5;
+    --line:#222838; --line2:#2a3146; --good:#0fcf7b; --bad:#ff5c5c; --warn:#ffd65c;
+    --brand:#e9b948; /* gold */
+    --accent:#6ac8ff; /* electric */
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 80% -20%, #13172a 10%, transparent 60%), var(--bg); color:var(--ink); font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu; }
+  a{color:var(--ink); text-decoration:none}
+  .wrap{max-width:1200px;margin:0 auto;padding:16px}
+  /* hero */
+  .hero{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:8px 0 18px}
+  .brand{display:flex;gap:12px;align-items:center}
+  .lion{
+    width:54px;height:54px;border-radius:14px;
+    background: conic-gradient(from 120deg, #7b5b12, #e9b948, #7b5b12);
+    position:relative; box-shadow:0 0 24px rgba(233,185,72,.25);
+  }
+  .lion:before{
+    content:"🦁"; position:absolute; inset:0; display:grid; place-items:center; font-size:34px; filter:drop-shadow(0 2px 2px rgba(0,0,0,.35));
+  }
+  h1{margin:0;font-size:28px;letter-spacing:.2px}
+  .tag{font-size:12px;border:1px solid var(--line2);color:var(--muted);border-radius:999px;padding:2px 8px;display:inline-block}
+  .bar{display:flex;gap:10px;flex-wrap:wrap}
+  .btn{padding:10px 14px;border:1px solid var(--line2);border-radius:12px;background:linear-gradient(120deg,var(--panel),var(--panel2));
+       transition:.15s; }
+  .btn:hover{transform:translateY(-1px); box-shadow:0 8px 18px rgba(0,0,0,.25)}
+  .btn.gold{border-color:#5c491c;background:linear-gradient(120deg,#1a1407,#121212); box-shadow: inset 0 0 12px rgba(233,185,72,.15)}
+  .btn.gold .dot{width:8px;height:8px;border-radius:50%;background:var(--brand);display:inline-block;margin-right:8px;box-shadow:0 0 16px rgba(233,185,72,.6)}
+  .btn.accent{border-color:#254660;background:linear-gradient(120deg,#101721,#0e121a)}
+  /* grid badges */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:12px 0 18px}
+  .card{
+    position:relative;padding:14px;border:1px solid var(--line2);border-radius:14px;background:linear-gradient(120deg,var(--panel),#0e1117 80%);
+    overflow:hidden;
+  }
+  .muted{color:var(--muted);font-size:12px;margin-bottom:6px}
+  .big{font-size:22px;font-weight:800;letter-spacing:.3px}
+  /* shimmer */
+  .shimmer{position:relative;overflow:hidden}
+  .shimmer:after{
+    content:""; position:absolute; inset:0; transform:translateX(-120%);
+    background:linear-gradient(110deg, transparent 0%, rgba(255,255,255,.08) 20%, transparent 42%);
+    animation:sh 1.4s linear infinite;
+  }
+  @keyframes sh{to{transform:translateX(120%)}}
+  /* tables */
+  table{width:100%;border-collapse:collapse;border-radius:14px;overflow:hidden;background:linear-gradient(180deg,var(--panel),var(--panel2))}
+  thead th{position:sticky;top:0;background:#0d1016;padding:10px;font-weight:600;text-align:left;border-bottom:1px solid var(--line)}
+  tbody td{padding:10px;border-bottom:1px solid var(--line)}
+  tr.win{background:rgba(15,207,123,.06)} tr.loss{background:rgba(255,92,92,.06)} tr.be{background:rgba(255,214,92,.06)}
+  .badge{font-size:12px;border:1px solid var(--line2);padding:2px 8px;border-radius:999px}
+  .good{color:var(--good)} .bad{color:var(--bad)} .warn{color:var(--warn)}
+  /* mini controls */
+  .controls{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 16px}
+  input.search{background:#0e1117;border:1px solid var(--line2);color:var(--ink);border-radius:10px;padding:10px 12px;min-width:180px}
+  select.sel{background:#0e1117;border:1px solid var(--line2);color:var(--ink);border-radius:10px;padding:10px 12px}
+  /* footer */
+  .foot{opacity:.7;font-size:12px;margin:18px 0;text-align:center}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <div class="brand">
+        <div class="lion"></div>
+        <div>
+          <div class="tag">LogiQ Signals</div>
+          <h1>Live Trading Dashboard</h1>
+          <div class="muted">Auto-updates from your Google Sheet — Options • Futures • Crypto ready</div>
+        </div>
+      </div>
+      <div class="bar">
+        <a class="btn" href="/">← Home</a>
+        <a class="btn accent" href="/signals.html" id="refreshBtn">Refresh</a>
+        <a class="btn gold" href="/pricing"><span class="dot"></span>Get Signals</a>
+      </div>
+    </div>
+
+    <!-- KPI CARDS -->
+    <div class="grid" id="kpis">
+      <div class="card shimmer" id="k-updated-card"><div class="muted">Updated</div><div class="big" id="k-updated">—</div></div>
+      <div class="card shimmer"><div class="muted">This Month — Trades</div><div class="big" id="k-trades">—</div></div>
+      <div class="card shimmer"><div class="muted">This Month — Win %</div><div class="big" id="k-win">—</div></div>
+      <div class="card shimmer"><div class="muted">This Month — Total $</div><div class="big" id="k-profit">—</div></div>
+    </div>
+
+    <!-- CONTROLS -->
+    <div class="controls">
+      <input class="search" id="q" placeholder="Search symbol (TSLA), strategy (EMA), or note…"/>
+      <select class="sel" id="resultSel">
+        <option value="">All Results</option>
+        <option value="Win">Wins</option>
+        <option value="Loss">Losses</option>
+        <option value="BE">Break-even</option>
+      </select>
+      <select class="sel" id="monthSel">
+        <option value="">All Months</option>
+        <option>January</option><option>February</option><option>March</option><option>April</option><option>May</option><option>June</option>
+        <option>July</option><option>August</option><option>September</option><option>October</option><option>November</option><option>December</option>
+      </select>
+      <a class="btn" href="#" id="clearFilters">Clear</a>
+    </div>
+
+    <!-- SUMMARY -->
+    <h2 style="margin:10px 0 8px">Monthly Summary</h2>
+    <table id="summary">
+      <thead>
+        <tr><th>Month</th><th>Total $</th><th>Win %</th><th>Avg R</th><th>Trades</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <!-- TRADES -->
+    <h2 style="margin:18px 0 8px">Recent Trades</h2>
+    <table id="trades">
+      <thead>
+        <tr>
+          <th>Date</th><th>Symbol</th><th>Strat</th>
+          <th>Entry</th><th>Stop</th><th>Target</th>
+          <th>P/L %</th><th>Profit $</th><th>R</th><th>Result</th><th>Notes</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <div class="foot">© <span id="yr"></span> LogiQ Dominicus • Built for speed • Results not guaranteed. Trading involves risk.</div>
+  </div>
+
+<script>
+const SHEET_URL = "https://script.google.com/macros/s/AKfycbwAnAjZB8Gdwy11VolYNHBqngyUOykxHnIkPuTPF6SZz5PPhkNysYCDRSOWAW6Mwnb5/exec";
+const $ = (q)=>document.querySelector(q);
+const $$ = (q)=>document.querySelectorAll(q);
+
+let ALL_TRADES = [];
+let SUMMARY = [];
+
+function fmtNum(v, money=false, pct=false){
+  if(v==null || v==="") return money ? "$0" : (pct ? "0%" : "0");
+  if(pct) return (Number(v)||0).toFixed(2)+"%";
+  if(money) return (Number(v)||0).toLocaleString();
+  return (Number(v)||0).toFixed(2);
+}
+function monthName(dtStr){
+  try{
+    const d = new Date(dtStr);
+    return d.toLocaleString('en-US',{month:'long'});
+  }catch{ return ""; }
+}
+function setKPI(updatedAt){
+  $('#k-updated').textContent = new Date(updatedAt).toLocaleString();
+  $('#k-updated-card').classList.remove('shimmer');
+
+  const nowM = new Date().toLocaleString('en-US',{month:'long'});
+  const cur = SUMMARY.find(s=>s.month===nowM) || {trades:0, winRate:0, totalProfit:0};
+  $('#k-trades').textContent = cur.trades||0;
+  $('#k-win').textContent = Math.round((cur.winRate||0)*100)+'%';
+  $('#k-profit').textContent = (cur.totalProfit||0).toLocaleString();
+  $$('#kpis .card').forEach(c=>c.classList.remove('shimmer'));
+}
+
+function renderSummary(){
+  const body = $('#summary tbody'); body.innerHTML = '';
+  SUMMARY.forEach(s=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${s.month}</td>
+      <td>${fmtNum(s.totalProfit,true)}</td>
+      <td>${Math.round((s.winRate||0)*100)}%</td>
+      <td>${fmtNum(s.avgR)}</td>
+      <td>${s.trades||0}</td>`;
+    body.appendChild(tr);
+  });
+}
+function renderTrades(list){
+  const body = $('#trades tbody'); body.innerHTML='';
+  list.slice().reverse().slice(0,200).forEach(t=>{
+    const tr = document.createElement('tr');
+    tr.className = t.result==='Win' ? 'win' : (t.result==='Loss' ? 'loss' : 'be');
+    tr.innerHTML = `
+      <td>${t.date||''}</td>
+      <td>${t.symbol||''}</td>
+      <td>${t.strategy||''}</td>
+      <td>${t.entry??''}</td>
+      <td>${t.stop??''}</td>
+      <td>${t.target??''}</td>
+      <td>${fmtNum(t.plPct,false,true)}</td>
+      <td>${fmtNum(t.profit,true)}</td>
+      <td>${fmtNum(t.rMultiple)}</td>
+      <td><span class="badge">${t.result||''}</span></td>
+      <td>${t.notes||''}</td>`;
+    body.appendChild(tr);
+  });
+}
+
+async function load(){
+  // shimmer on first paint
+  $$('.card').forEach(c=>c.classList.add('shimmer'));
+
+  const res = await fetch(SHEET_URL, { cache:'no-store' });
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  const data = await res.json();
+  ALL_TRADES = data.trades || [];
+  SUMMARY = data.summary || [];
+
+  setKPI(data.updatedAt);
+  renderSummary();
+  renderTrades(ALL_TRADES);
+}
+
+function applyFilters(){
+  const q = $('#q').value.trim().toLowerCase();
+  const res = $('#resultSel').value;
+  const m = $('#monthSel').value;
+
+  let out = ALL_TRADES.slice();
+  if(q){
+    out = out.filter(t =>
+      (t.symbol||'').toLowerCase().includes(q) ||
+      (t.strategy||'').toLowerCase().includes(q) ||
+      (t.notes||'').toLowerCase().includes(q)
+    );
+  }
+  if(res){ out = out.filter(t => (t.result||'')===res); }
+  if(m){  out = out.filter(t => monthName(t.date)===m); }
+  renderTrades(out);
+}
+
+document.getElementById('refreshBtn').addEventListener('click', e=>{ e.preventDefault(); load().catch(showErr); });
+document.getElementById('clearFilters').addEventListener('click', e=>{
+  e.preventDefault(); $('#q').value=''; $('#resultSel').value=''; $('#monthSel').value=''; renderTrades(ALL_TRADES);
+});
+$('#q').addEventListener('input', applyFilters);
+$('#resultSel').addEventListener('change', applyFilters);
+$('#monthSel').addEventListener('change', applyFilters);
+
+function showErr(err){
+  document.body.innerHTML = `<div class="wrap"><h1>Load error</h1><p>${err.message||err}</p></div>`;
+}
+
+document.getElementById('yr').textContent = new Date().getFullYear();
+load().catch(showErr);
+</script>
+</body>
+</html>
